@@ -1,0 +1,63 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  bilikit-tests:
+    name: BiliKit unit tests (macOS)
+    runs-on: macos-15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: maxim-lobanov/setup-xcode@v1
+        with:
+          xcode-version: latest-stable
+      - name: swift test
+        working-directory: Packages/BiliKit
+        run: swift test
+
+  build-app:
+    name: Build tvOS app and tests
+    runs-on: macos-15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: maxim-lobanov/setup-xcode@v1
+        with:
+          xcode-version: latest-stable
+      - name: Install XcodeGen
+        run: brew install xcodegen
+      - name: Generate project
+        run: xcodegen generate
+      - name: Cache Swift packages
+        uses: actions/cache@v4
+        with:
+          path: build/SourcePackages
+          key: spm-${{ runner.os }}-${{ hashFiles('project.yml') }}
+      - name: Make sure the tvOS platform is installed
+        run: xcodebuild -downloadPlatform tvOS || true
+      - name: Build app
+        run: |
+          set -o pipefail
+          xcodebuild build -project DanmuTV.xcodeproj -scheme DanmuTV \
+            -destination 'generic/platform=tvOS Simulator' \
+            -derivedDataPath build/DerivedData -clonedSourcePackagesDirPath build/SourcePackages \
+            CODE_SIGNING_ALLOWED=NO | tail -40
+      - name: Build unit and UI test bundles
+        run: |
+          set -o pipefail
+          for scheme in DanmuTV DanmuTVUITests; do
+            xcodebuild build-for-testing -project DanmuTV.xcodeproj -scheme "$scheme" \
+              -destination 'generic/platform=tvOS Simulator' \
+              -derivedDataPath build/DerivedData -clonedSourcePackagesDirPath build/SourcePackages \
+              CODE_SIGNING_ALLOWED=NO | tail -20
+          done

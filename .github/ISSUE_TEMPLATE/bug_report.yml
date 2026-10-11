@@ -1,0 +1,46 @@
+name: Bug report / 问题反馈
+description: Something doesn't work as expected / 功能不正常
+labels: [bug]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Please search existing issues first. 请先搜索是否已有相同问题。
+        Never paste cookies, tokens or QR codes. 请勿贴出 Cookie、Token 或登录二维码。
+  - type: textarea
+    id: what
+    attributes:
+      label: What happened / 发生了什么
+      description: Include the video BV number for playback issues. 播放问题请附上视频 BV 号。
+    validations:
+      required: true
+  - type: textarea
+    id: steps
+    attributes:
+      label: Steps to reproduce / 复现步骤
+      placeholder: |
+        1. 打开…
+        2. 按…
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: Expected behavior / 期望结果
+  - type: input
+    id: device
+    attributes:
+      label: Apple TV model and tvOS version / 设备与系统版本
+      placeholder: Apple TV 4K (1st gen), tvOS 27.0
+    validations:
+      required: true
+  - type: input
+    id: commit
+    attributes:
+      label: Danmu TV commit / 版本
+      placeholder: e.g. a1b2c3d
+  - type: dropdown
+    id: account
+    attributes:
+      label: Signed in? / 是否登录
+      options: ["Yes / 已登录", "No / 未登录", "Premium (大会员)"]

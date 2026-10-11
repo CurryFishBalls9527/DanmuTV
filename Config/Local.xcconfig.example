@@ -1,0 +1,5 @@
+// Copy to Local.xcconfig (git-ignored) and fill in.
+DEVELOPMENT_TEAM = ABCDE12345
+APP_BUNDLE_ID = com.yourname.DanmuTV
+// Free Apple ID (personal team): uncomment.
+// DANMUTV_APP_GROUP = NO

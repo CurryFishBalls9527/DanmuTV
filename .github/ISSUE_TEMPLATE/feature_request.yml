@@ -1,0 +1,22 @@
+name: Feature request / 功能建议
+description: Suggest an idea / 提出新功能或改进
+labels: [enhancement]
+body:
+  - type: textarea
+    id: problem
+    attributes:
+      label: What would you like to do? / 你想做什么
+      description: Describe the need, not only the solution. 描述需求，而不只是方案。
+    validations:
+      required: true
+  - type: textarea
+    id: idea
+    attributes:
+      label: How could it work on Apple TV? / 在 Apple TV 上怎么用
+  - type: checkboxes
+    id: scope
+    attributes:
+      label: Scope / 范围
+      options:
+        - label: This doesn't bypass paywalls, membership, region or copyright restrictions. 不涉及绕过付费、会员、地区或版权限制。
+          required: true
