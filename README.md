@@ -78,7 +78,7 @@
 Danmu TV 不在 App Store 上架，需要自己编译安装到 Apple TV。
 
 **需要**
-- 一台 Mac，安装 Xcode（在 Xcode 27 上开发和测试；需要 tvOS 17 SDK 及以上）
+- 一台 Mac，安装 Xcode 26 或更高版本（CI 使用 Xcode 26，开发使用 Xcode 27）
 - [XcodeGen](https://github.com/yonaskolb/XcodeGen)：`brew install xcodegen`
 - Apple TV（tvOS 17+），与 Mac 在同一网络
 - Apple ID。免费账号签名 7 天后过期需要重新安装，且不支持 App Group（在 `Local.xcconfig` 里设 `DANMUTV_APP_GROUP = NO`，Top Shelf 只显示热门）；付费开发者账号（每年 99 美元）一年有效，功能完整

@@ -79,7 +79,7 @@ commenters' names and avatars are blurred.</sub>
 Danmu TV isn't on the App Store; build it and install it on your Apple TV yourself.
 
 **You need**
-- A Mac with Xcode (developed and tested with Xcode 27; needs the tvOS 17 SDK or later)
+- A Mac with Xcode 26 or later (CI builds with Xcode 26; developed with Xcode 27)
 - [XcodeGen](https://github.com/yonaskolb/XcodeGen): `brew install xcodegen`
 - An Apple TV on tvOS 17+, on the same network as the Mac
 - An Apple ID. With a free account the signature expires after 7 days and App Groups aren't available (set
