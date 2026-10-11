@@ -93,7 +93,7 @@ final class DanmakuRasterizer: @unchecked Sendable {
         let origin = CGPoint(x: pad, y: pad + descent)
         let radius = pad * 0.75
         for i in 0 ..< 8 {
-            let angle = Double(i) * .pi / 4
+            let angle = CGFloat(i) * .pi / 4
             context.textPosition = CGPoint(x: origin.x + radius * cos(angle), y: origin.y + radius * sin(angle))
             CTLineDraw(outlineLine, context)
         }
