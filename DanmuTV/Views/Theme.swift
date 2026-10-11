@@ -176,8 +176,8 @@ enum AmbientArt {
         let key = url.absoluteString as NSString
         if let hit = cache.object(forKey: key) { return hit }
         guard let (data, _) = try? await URLSession.shared.data(from: url), !Task.isCancelled else { return nil }
-        let render = Task.detached(priority: .utility) { render(data) }
-        let image = await withTaskCancellationHandler { await render.value } onCancel: { render.cancel() }
+        let job = Task.detached(priority: .utility) { Self.render(data) }
+        let image = await withTaskCancellationHandler { await job.value } onCancel: { job.cancel() }
         if let image { cache.setObject(image, forKey: key) }
         return image
     }
