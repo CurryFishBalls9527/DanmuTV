@@ -18,7 +18,9 @@ Native tvOS experience · 4K / HDR / Dolby Vision · smooth danmaku · cast from
 > [!IMPORTANT]
 > Danmu TV is an **unofficial**, open-source project. It is **not affiliated with, endorsed by, or connected to**
 > Bilibili (Shanghai Kuanyu Digital Technology Co., Ltd.). It has **never been published or sold** on the App Store,
-> TestFlight or anywhere else; anyone charging for it is not us.
+> TestFlight or anywhere else, and no prebuilt packages are provided; anyone charging for it is not us.
+> **Only install builds you compiled yourself from this repository.** Packages built by others may be tampered with,
+> and this app signs in to your Bilibili account.
 
 ---
 
@@ -106,6 +108,8 @@ To just try it in the simulator, skip steps 1 and 2.
 - Simplified Chinese interface only.
 - HDR / Dolby Vision / Atmos and display matching are implemented but verified on few devices; reports welcome.
 - Casting works only while Danmu TV is open (tvOS doesn't keep background apps on the network).
+- The cast receiver doesn't require pairing: any device on the same network can start, pause or stop playback. Turn
+  it off in Settings › 投屏 if you don't need it.
 - Person masking needs Bilibili's masks, which only some videos have; quality depends on their data.
 - Logged out, Bilibili returns only the top 3 comments.
 - The APIs are unofficial and may break when Bilibili changes them.
@@ -147,10 +151,14 @@ Contributions are welcome; see [CONTRIBUTING.md](CONTRIBUTING.md).
   Premium (大会员) content requires your own premium account.
 - The APIs used are not public and may change or stop working at any time. Using this software may violate
   Bilibili's terms of service; **you use it at your own risk**.
+- Third-party clients may trigger Bilibili's risk control and lead to account restrictions or bans. The author is not
+  responsible for account problems, data loss or any other damage resulting from using this software.
 - Danmu TV is released under GPL-3.0. The author does not sell it or offer any paid version or service; anyone
   charging for it is not connected to the author. We hope it is used for learning and personal use.
 - Login credentials stay in your device's Keychain (synced between your own devices if iCloud Keychain is on) and are
-  sent to no server other than Bilibili's. The project collects no data.
+  sent only to Bilibili. The project collects no data and has no analytics or crash reporting. The only third-party
+  request: with sponsor-segment skipping switched on (off by default), the playing video's BV id is sent to
+  [BilibiliSponsorBlock](https://github.com/hanydd/BilibiliSponsorBlock) (bsbsb.top); no account data is included.
 - The software is provided "as is", without warranty of any kind; see [LICENSE](LICENSE).
 - To interoperate with the official phone app's casting, Danmu TV's UPnP replies on the local network use protocol
   identifiers of the official TV app (package name, manufacturer), and some endpoints require the publicly circulated
