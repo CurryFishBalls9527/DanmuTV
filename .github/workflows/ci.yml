@@ -18,7 +18,7 @@ jobs:
     name: BiliKit unit tests (macOS)
     runs-on: macos-15
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
       - uses: maxim-lobanov/setup-xcode@v1
         with:
           xcode-version: latest-stable
@@ -30,7 +30,7 @@ jobs:
     name: Build tvOS app and tests
     runs-on: macos-15
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
       - uses: maxim-lobanov/setup-xcode@v1
         with:
           xcode-version: latest-stable
@@ -51,7 +51,7 @@ jobs:
           xcodebuild build -project DanmuTV.xcodeproj -scheme DanmuTV \
             -destination 'generic/platform=tvOS Simulator' \
             -derivedDataPath build/DerivedData -clonedSourcePackagesDirPath build/SourcePackages \
-            CODE_SIGNING_ALLOWED=NO | tail -40
+            CODE_SIGNING_ALLOWED=NO | xcbeautify --renderer github-actions
       - name: Build unit and UI test bundles
         run: |
           set -o pipefail
@@ -59,5 +59,5 @@ jobs:
             xcodebuild build-for-testing -project DanmuTV.xcodeproj -scheme "$scheme" \
               -destination 'generic/platform=tvOS Simulator' \
               -derivedDataPath build/DerivedData -clonedSourcePackagesDirPath build/SourcePackages \
-              CODE_SIGNING_ALLOWED=NO | tail -20
+              CODE_SIGNING_ALLOWED=NO | xcbeautify --renderer github-actions
           done
