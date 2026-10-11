@@ -1,0 +1,130 @@
+name: DanmuTV
+options:
+  developmentLanguage: zh-Hans
+  deploymentTarget:
+    tvOS: "17.0"
+settings:
+  base:
+    SWIFT_VERSION: "5.0"
+    MARKETING_VERSION: "0.1.0"
+    CURRENT_PROJECT_VERSION: "1"
+    CODE_SIGN_STYLE: Automatic
+# DEVELOPMENT_TEAM and APP_BUNDLE_ID: Config/Signing.xcconfig (+ your git-ignored Config/Local.xcconfig).
+configFiles:
+  Debug: Config/Signing.xcconfig
+  Release: Config/Signing.xcconfig
+packages:
+  BiliKit:
+    path: Packages/BiliKit
+  VLCKitSPM:
+    url: https://github.com/tylerjonesio/vlckit-spm
+    exactVersion: 3.6.0
+  AMSMB2:
+    url: https://github.com/amosavian/AMSMB2
+    exactVersion: 4.0.3
+targets:
+  DanmuTV:
+    type: application
+    platform: tvOS
+    sources:
+      - DanmuTV
+    dependencies:
+      - package: BiliKit
+      - package: VLCKitSPM
+        product: VLCKitSPM
+      # AMSMB2 is a dynamic framework: it must be embedded or the app dies at launch on device.
+      - package: AMSMB2
+        embed: true
+      - target: TopShelf
+    info:
+      path: DanmuTV/Resources/Info.plist
+      properties:
+        CFBundleDisplayName: Danmu TV
+        CFBundleShortVersionString: $(MARKETING_VERSION)
+        CFBundleVersion: $(CURRENT_PROJECT_VERSION)
+        DanmuTVAppGroup: group.$(APP_BUNDLE_ID)
+        CFBundleDevelopmentRegion: zh-Hans
+        UILaunchScreen: {}
+        UIUserInterfaceStyle: Automatic
+        UIRequiresFullScreen: true
+        CFBundleURLTypes:
+          - CFBundleURLName: $(APP_BUNDLE_ID)
+            CFBundleURLSchemes: [danmutv]
+        NSAppTransportSecurity:
+          # Plain-HTTP media from the local network and from DLNA senders (投屏 of a bare media URL).
+          NSAllowsLocalNetworking: true
+          NSAllowsArbitraryLoadsForMedia: true
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: $(APP_BUNDLE_ID)
+        # App Group shared with the Top Shelf extension (继续观看); off for free teams (DANMUTV_APP_GROUP = NO).
+        DANMUTV_ENTITLEMENTS_YES: DanmuTV/DanmuTV.entitlements
+        CODE_SIGN_ENTITLEMENTS: $(DANMUTV_ENTITLEMENTS_$(DANMUTV_APP_GROUP))
+        ASSETCATALOG_COMPILER_APPICON_NAME: "App Icon & Top Shelf Image"
+        # 可切换的 App 图标 (Settings › 外观)
+        ASSETCATALOG_COMPILER_ALTERNATE_APPICON_NAMES: "Midnight Light"
+        ASSETCATALOG_COMPILER_INCLUDE_ALL_APPICON_ASSETS: YES
+  TopShelf:
+    type: app-extension
+    platform: tvOS
+    sources:
+      - TopShelf
+    dependencies:
+      - package: BiliKit
+    info:
+      path: TopShelf/Info.plist
+      properties:
+        CFBundleDisplayName: Danmu TV
+        DanmuTVAppGroup: group.$(APP_BUNDLE_ID)
+        CFBundleShortVersionString: $(MARKETING_VERSION)
+        CFBundleVersion: $(CURRENT_PROJECT_VERSION)
+        NSExtension:
+          NSExtensionPointIdentifier: com.apple.tv-top-shelf
+          NSExtensionPrincipalClass: $(PRODUCT_MODULE_NAME).ContentProvider
+        NSAppTransportSecurity:
+          NSAllowsArbitraryLoads: false
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: $(APP_BUNDLE_ID).TopShelf
+        DANMUTV_ENTITLEMENTS_YES: TopShelf/TopShelf.entitlements
+        CODE_SIGN_ENTITLEMENTS: $(DANMUTV_ENTITLEMENTS_$(DANMUTV_APP_GROUP))
+  BiliKitTests:
+    type: bundle.unit-test
+    platform: tvOS
+    sources:
+      - Packages/BiliKit/Tests/BiliKitTests
+    settings:
+      base:
+        GENERATE_INFOPLIST_FILE: YES
+        PRODUCT_BUNDLE_IDENTIFIER: $(APP_BUNDLE_ID).UnitTests
+    dependencies:
+      - package: BiliKit
+  DanmuTVUITests:
+    type: bundle.ui-testing
+    platform: tvOS
+    sources:
+      - DanmuTVUITests
+    settings:
+      base:
+        GENERATE_INFOPLIST_FILE: YES
+        PRODUCT_BUNDLE_IDENTIFIER: $(APP_BUNDLE_ID).UITests
+        TEST_TARGET_NAME: DanmuTV
+    dependencies:
+      - target: DanmuTV
+schemes:
+  # Remote-driven UI checks in the simulator (hit the live API, so run them deliberately, not with every unit-test pass).
+  DanmuTVUITests:
+    build:
+      targets:
+        DanmuTV: all
+        DanmuTVUITests: [test]
+    test:
+      targets:
+        - DanmuTVUITests
+  DanmuTV:
+    build:
+      targets:
+        DanmuTV: all
+    test:
+      targets:
+        - BiliKitTests

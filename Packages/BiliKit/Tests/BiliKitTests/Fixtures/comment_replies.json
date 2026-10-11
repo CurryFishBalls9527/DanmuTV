@@ -1,0 +1,103 @@
+{
+ "code": 0,
+ "message": "0",
+ "data": {
+  "page": {
+   "num": 1,
+   "size": 3,
+   "count": 617
+  },
+  "replies": [
+   {
+    "rpid": 1353872650,
+    "mid": 1009,
+    "like": 244,
+    "rcount": 0,
+    "ctime": 1549170507,
+    "member": {
+     "mid": "1009",
+     "uname": "用户9",
+     "avatar": "https://i0.hdslb.com/bfs/face/member/noface.jpg",
+     "level_info": {
+      "current_level": 6
+     },
+     "vip": {
+      "vipStatus": 0
+     }
+    },
+    "content": {
+     "message": "示例评论 16"
+    },
+    "up_action": {
+     "like": false,
+     "reply": false
+    },
+    "reply_control": {
+     "time_desc": "2807天前发布"
+    },
+    "replies": []
+   },
+   {
+    "rpid": 1354185553,
+    "mid": 1010,
+    "like": 93,
+    "rcount": 0,
+    "ctime": 1549178162,
+    "member": {
+     "mid": "1010",
+     "uname": "用户10",
+     "avatar": "https://i0.hdslb.com/bfs/face/member/noface.jpg",
+     "level_info": {
+      "current_level": 6
+     },
+     "vip": {
+      "vipStatus": 0
+     }
+    },
+    "content": {
+     "message": "示例评论 17"
+    },
+    "up_action": {
+     "like": false,
+     "reply": false
+    },
+    "reply_control": {
+     "time_desc": "2807天前发布"
+    },
+    "replies": []
+   },
+   {
+    "rpid": 1354245937,
+    "mid": 1011,
+    "like": 78,
+    "rcount": 0,
+    "ctime": 1549179777,
+    "member": {
+     "mid": "1011",
+     "uname": "用户11",
+     "avatar": "https://i0.hdslb.com/bfs/face/member/noface.jpg",
+     "level_info": {
+      "current_level": 5
+     },
+     "vip": {
+      "vipStatus": 0
+     }
+    },
+    "content": {
+     "message": "示例评论 18"
+    },
+    "up_action": {
+     "like": false,
+     "reply": false
+    },
+    "reply_control": {
+     "time_desc": "2807天前发布"
+    },
+    "replies": []
+   }
+  ],
+  "root": {
+   "rpid": 1353715029
+  }
+ }
+}

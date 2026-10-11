@@ -1,0 +1,12 @@
+// Signing and identifiers. Defaults here build for the simulator; for an Apple TV, copy
+// Local.xcconfig.example to Local.xcconfig (git-ignored) and set your own team and bundle id.
+
+// Your Apple developer team ID (Xcode › Settings › Accounts).
+DEVELOPMENT_TEAM =
+// App bundle id; the Top Shelf extension is <this>.TopShelf and the shared App Group is group.<this>.
+APP_BUNDLE_ID = com.example.DanmuTV
+// App Group for Top Shelf 继续观看. Free (personal) teams can't sign App Groups: set NO in Local.xcconfig;
+// everything else works, Top Shelf then shows 热门 only.
+DANMUTV_APP_GROUP = YES
+
+#include? "Local.xcconfig"
