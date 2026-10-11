@@ -2,6 +2,7 @@ import AVKit
 import BiliKit
 import SwiftUI
 import UIKit
+import VideoToolbox
 import VLCKitSPM
 
 /// Live chat over the video: scrolling danmaku (shared renderer, wall clock), pinned 醒目留言,
