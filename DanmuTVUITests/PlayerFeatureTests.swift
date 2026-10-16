@@ -28,6 +28,28 @@ final class PlayerFeatureTests: RemoteTestCase {
         waitForPlaying()
     }
 
+    /// 高能进度条: the curve fills in from the danmaku and shows with the transport bar.
+    func testHeatBarShowsWithTransportBar() {
+        app.launchArguments = ["-muted", "YES", "-heatBar", "YES", "-deeplink", "danmutv://play/BV1Lrpu61EPg?p=1"]
+        app.launch()
+        XCTAssertTrue(marker.waitForExistence(timeout: 15))
+        waitForPlaying()
+        let heat = app.descendants(matching: .any)["player.heat"]
+        let deadline = Date().addingTimeInterval(30)
+        while Date() < deadline, (Int(heat.value as? String ?? "") ?? 0) == 0 { Thread.sleep(forTimeInterval: 1) }
+        log("heat samples: \(heat.value as? String ?? "-")")
+        XCTAssertGreaterThan(Int(heat.value as? String ?? "") ?? 0, 10, "heat curve loaded")
+        press(.playPause, wait: 2)
+        shot("heat-bar")
+        // The busiest moments are markers in the 章节 tab once every segment is counted.
+        sleep(8)
+        press(.down, wait: 1.5)
+        // Tabs: 简介 (focused first), 章节, 详情. AVKit's tabs don't report focus, so step blindly.
+        press(.right, wait: 2)
+        shot("heat-markers")
+        XCTAssertTrue(app.staticTexts.matching(NSPredicate(format: "label BEGINSWITH '高能 1'")).firstMatch.exists, "highlight markers listed")
+    }
+
     func testHoldSelectSpeedsUpAndReleaseRestores() {
         play()
         remote.press(.select, forDuration: 3)

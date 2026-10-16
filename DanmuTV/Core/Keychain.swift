@@ -6,6 +6,22 @@ import Security
 enum Keychain {
     private static let service = "DanmuTV"
 
+    /// tvOS 多用户: the app runs as the current Apple TV user (each user has their own settings and chosen profile),
+    /// and the profiles themselves live in the keychain all users share, so nobody has to log in again. Only when the
+    /// build has the user-management entitlement (paid teams) and the keychain accepts it; otherwise as before.
+    static let userIndependent: Bool = {
+        guard (Bundle.main.object(forInfoDictionaryKey: "DanmuTVRunsAsCurrentUser") as? String) == "YES" else { return false }
+        let probe: [String: Any] = [
+            kSecClass as String: kSecClassGenericPassword,
+            kSecAttrService as String: service,
+            kSecAttrSynchronizable as String: kSecAttrSynchronizableAny,
+            kSecUseUserIndependentKeychain as String: true,
+            kSecMatchLimit as String: kSecMatchLimitOne,
+        ]
+        let status = SecItemCopyMatching(probe as CFDictionary, nil)
+        return status == errSecSuccess || status == errSecItemNotFound
+    }()
+
     enum Scope {
         /// This device only.
         case local
@@ -36,8 +52,41 @@ enum Keychain {
             kSecAttrService as String: service,
             kSecAttrSynchronizable as String: scope.attribute,
         ]
+        if userIndependent { query[kSecUseUserIndependentKeychain as String] = true }
         if let key { query[kSecAttrAccount as String] = key }
         return query
+    }
+
+    /// Once the app runs as the current user, items saved before (in this user's own keychain) are copied to the shared
+    /// one. Nothing is ever deleted here: an old copy costs nothing, while a delete could remove the only copy (if both
+    /// queries reach the same store) or, for an iCloud item, remove it from every device. When the shared store
+    /// already has the item, the newer of the two wins (a rotated token must not be lost). Returns false if any item
+    /// couldn't be copied, so the caller tries again next launch.
+    @discardableResult
+    static func adoptUserItems(prefix: String) -> Bool {
+        guard userIndependent else { return true }
+        let query: [String: Any] = [
+            kSecClass as String: kSecClassGenericPassword,
+            kSecAttrService as String: service,
+            kSecAttrSynchronizable as String: kSecAttrSynchronizableAny,
+            kSecReturnAttributes as String: true,
+            kSecReturnData as String: true,
+            kSecMatchLimit as String: kSecMatchLimitAll,
+        ]
+        var out: AnyObject?
+        guard SecItemCopyMatching(query as CFDictionary, &out) == errSecSuccess, let rows = out as? [[String: Any]] else { return true }
+        let shared = Dictionary(items(prefix: prefix, scope: .any).map { ($0.key, $0) }, uniquingKeysWith: { a, b in a.modified >= b.modified ? a : b })
+        var ok = true
+        for row in rows {
+            guard let key = row[kSecAttrAccount as String] as? String, key.hasPrefix(prefix),
+                  let data = row[kSecValueData as String] as? Data
+            else { continue }
+            let modified = row[kSecAttrModificationDate as String] as? Date ?? .distantPast
+            if let existing = shared[key], existing.modified >= modified || existing.data == data { continue }
+            let synced = (row[kSecAttrSynchronizable as String] as? Bool) ?? false
+            if !upsert(data, for: key, synced: synced) { ok = false }
+        }
+        return ok
     }
 
     /// All items whose key starts with `prefix`.

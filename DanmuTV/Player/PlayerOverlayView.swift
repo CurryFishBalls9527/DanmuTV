@@ -14,12 +14,22 @@ final class VODDanmakuSource {
     private var retryAfter: [Int: Date] = [:]
     private var failures: [Int: Int] = [:]
     private var tasks: [Task<Void, Never>] = []
+    /// 高能进度条: comment counts over the whole video, from every segment as it loads (before filtering).
+    private var heat: HeatCounter?
+    private var heatTask: Task<Void, Never>?
+    /// Called whenever the heat curve gains a segment: the curve so far, and whether every segment is in.
+    var onHeatChange: ((HeatCurve?, Bool) -> Void)?
 
     private static let maxAttempts = 3
+    /// Longest video whose every segment is fetched for the heat curve (20 segments = 2 hours).
+    private static let maxHeatSegments = 20
 
     func reset(cid: Int, filter: DanmakuFilter, merge: Bool) {
         tasks.forEach { $0.cancel() }
         tasks = []
+        heatTask?.cancel()
+        heatTask = nil
+        heat = nil
         self.cid = cid
         self.filter = filter
         self.merge = merge
@@ -48,14 +58,42 @@ final class VODDanmakuSource {
         }
     }
 
+    /// 高能进度条: counts every comment of the video. Segments the player hasn't reached yet are fetched one at a
+    /// time in the background (spaced out, so a long video doesn't burst requests).
+    func startHeat(duration: Double) {
+        guard cid > 0, duration > 0, heat == nil else { return }
+        let counter = HeatCounter(duration: duration)
+        guard counter.segmentCount <= Self.maxHeatSegments else { return }
+        heat = counter
+        let cid = cid
+        heatTask = Task { [weak self] in
+            for segment in 1 ... counter.segmentCount {
+                // Wait out a fetch the playback side already started for this segment.
+                while !Task.isCancelled, let self, self.cid == cid, self.inflight.contains(segment) {
+                    try? await Task.sleep(nanoseconds: 300_000_000)
+                }
+                guard let self, self.cid == cid, !Task.isCancelled, !self.useXML else { return }
+                guard !self.timeline.loadedSegments.contains(segment) else { continue }
+                self.fetch(segment)
+                try? await Task.sleep(nanoseconds: 1_500_000_000)
+            }
+        }
+    }
+
+    private func countHeat(segment: Int, times: [Double]) {
+        guard heat?.add(segment: segment, times: times) == true else { return }
+        onHeatChange?(heat?.curve, heat?.isComplete ?? false)
+    }
+
     private func fetch(_ segment: Int) {
         inflight.insert(segment)
         let (cid, filter, merge) = (cid, filter, merge)
         tasks.append(Task { [weak self] in
-            let result = await Task.detached(priority: .utility) { () -> Result<[Danmaku], Error> in
+            let result = await Task.detached(priority: .utility) { () -> Result<(items: [Danmaku], times: [Double]), Error> in
                 do {
-                    let items = try await API.danmakuSegment(cid: cid, segment: segment).filter(filter.allows)
-                    return .success(merge ? DanmakuMerger.merge(items) : items)
+                    let all = try await API.danmakuSegment(cid: cid, segment: segment)
+                    let items = all.filter(filter.allows)
+                    return .success((merge ? DanmakuMerger.merge(items) : items, all.map(\.time)))
                 } catch {
                     return .failure(error)
                 }
@@ -64,12 +102,13 @@ final class VODDanmakuSource {
         })
     }
 
-    private func finish(_ segment: Int, cid: Int, result: Result<[Danmaku], Error>) {
+    private func finish(_ segment: Int, cid: Int, result: Result<(items: [Danmaku], times: [Double]), Error>) {
         guard cid == self.cid else { return }
         inflight.remove(segment)
         switch result {
-        case let .success(items):
+        case let .success((items, times)):
             timeline.add(items, segment: segment, mergeWindow: merge ? 15 : nil)
+            countHeat(segment: segment, times: times)
         case let .failure(error):
             guard !BiliClient.isCancellation(error) else { return }
             let attempts = (failures[segment] ?? 0) + 1
@@ -88,14 +127,18 @@ final class VODDanmakuSource {
         useXML = true
         let (cid, filter, merge) = (cid, filter, merge)
         tasks.append(Task { [weak self] in
-            let items = await Task.detached(priority: .utility) { () -> [Danmaku]? in
+            let loaded = await Task.detached(priority: .utility) { () -> (items: [Danmaku], times: [Double])? in
                 guard let all = try? await API.danmakuXML(cid: cid) else { return nil }
                 let kept = all.filter(filter.allows)
-                return merge ? DanmakuMerger.merge(kept) : kept
+                return (merge ? DanmakuMerger.merge(kept) : kept, all.map(\.time))
             }.value
             guard let self, cid == self.cid else { return }
-            if let items {
+            if let (items, times) = loaded {
                 self.timeline.add(items, segment: 1)
+                // The XML list is the whole video (capped by Bilibili): count it as every segment at once.
+                if let counter = self.heat {
+                    for s in 1 ... counter.segmentCount { self.countHeat(segment: s, times: s == 1 ? times : []) }
+                }
             } else {
                 // Both failed: go back to segments, retrying later.
                 self.useXML = false
@@ -244,6 +287,12 @@ final class PlayerOverlayView: UIView {
         preparedUntil = -.infinity
         setSubtitles([])
         setMask(nil)
+    }
+
+    /// 高能进度条 for the current page (see `VODDanmakuSource.startHeat`).
+    func startHeat(duration: Double, onChange: @escaping (HeatCurve?, Bool) -> Void) {
+        source.onHeatChange = onChange
+        source.startHeat(duration: duration)
     }
 
     func setMask(_ info: DanmakuMaskInfo?) {

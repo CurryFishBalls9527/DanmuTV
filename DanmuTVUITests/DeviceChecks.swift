@@ -74,4 +74,34 @@ final class DeviceChecks: RemoteTestCase {
             sleep(3)
         }
     }
+
+    /// 画中画 (the simulator has no PiP): the system button (last in the transport bar's trailing row; AVKit's buttons
+    /// aren't exposed to UI tests, so the row is walked by position) puts the player in a corner; it keeps playing
+    /// while the app is browsed and after Home, and 全屏 brings it back.
+    func testPictureInPicture() {
+        app.launchArguments = ["-muted", "YES", "-deeplink", "danmutv://play/BV1vGp46bEdw?p=1"]
+        app.launch()
+        XCTAssertTrue(marker.waitForExistence(timeout: 20))
+        sleep(8)
+        press(.playPause, wait: 2)
+        press(.up, wait: 1.5)
+        press(.right, 8, wait: 0.6)
+        shot("device-pip-button")
+        press(.select, wait: 4)
+        press(.playPause, wait: 3)
+        let pos = Int(state()["pos"] ?? "") ?? 0
+        shot("device-pip-corner")
+        sleep(5)
+        log("pip: \(state())")
+        XCTAssertGreaterThan(Int(state()["pos"] ?? "") ?? 0, pos, "playing in the corner")
+        XCUIRemote.shared.press(.home)
+        sleep(5)
+        let home = XCTAttachment(screenshot: XCUIScreen.main.screenshot())
+        home.name = "device-pip-home"
+        home.lifetime = .keepAlways
+        add(home)
+        app.activate()
+        sleep(3)
+        log("after home: \(state())")
+    }
 }

@@ -245,10 +245,12 @@ final class LivePlayerViewController: AVPlayerViewController, PlayerTeardown {
         super.viewDidLoad()
         // 竖屏直播间: aspect fit, never cropped.
         videoGravity = .resizeAspect
+        allowsPictureInPicturePlayback = true
         chat.frame = contentOverlayView?.bounds ?? view.bounds
         chat.autoresizingMask = [.flexibleWidth, .flexibleHeight]
         chat.onNotice = { [weak self] text in self?.showToast(text) }
         contentOverlayView?.addSubview(chat)
+        delegate = self
         configureToast()
         chat.start(roomID: info.roomID > 0 ? info.roomID : room.roomID)
         play()
@@ -257,7 +259,7 @@ final class LivePlayerViewController: AVPlayerViewController, PlayerTeardown {
 
     override func viewDidDisappear(_ animated: Bool) {
         super.viewDidDisappear(animated)
-        if isBeingDismissed || presentingViewController == nil { teardown() }
+        if isBeingDismissed || presentingViewController == nil, !PictureInPicture.keeps(self) { teardown() }
     }
 
     /// 退出直播后立即释放音频.
@@ -412,6 +414,8 @@ final class VLCLivePlayerViewController: UIViewController, PlayerTeardown, VLCMe
     private var routeIndex = 0
     private var reconnects = 0
     private var tornDown = false
+    /// VLC (unlike AVPlayer) keeps playing in the background now that the app has the audio background mode.
+    private var lifecycleObservers: [NSObjectProtocol] = []
 
     init(room: LiveRoom, info: LivePlayInfo) {
         self.room = room
@@ -449,6 +453,16 @@ final class VLCLivePlayerViewController: UIViewController, PlayerTeardown, VLCMe
         chat.start(roomID: info.roomID > 0 ? info.roomID : room.roomID)
         play()
         showStatus(nil)
+        let center = NotificationCenter.default
+        lifecycleObservers = [
+            center.addObserver(forName: UIApplication.didEnterBackgroundNotification, object: nil, queue: .main) { [weak self] _ in
+                MainActor.assumeIsolated { if self?.tornDown == false { self?.mediaPlayer.pause() } }
+            },
+            // Back at the live edge rather than where it paused.
+            center.addObserver(forName: UIApplication.willEnterForegroundNotification, object: nil, queue: .main) { [weak self] _ in
+                MainActor.assumeIsolated { if self?.tornDown == false { self?.play() } }
+            },
+        ]
     }
 
     private var stream: LiveStream? { info.preferredStream(useVLC: true, allowHEVC: false) }
@@ -600,6 +614,8 @@ final class VLCLivePlayerViewController: UIViewController, PlayerTeardown, VLCMe
     func teardown() {
         guard !tornDown else { return }
         tornDown = true
+        lifecycleObservers.forEach(NotificationCenter.default.removeObserver)
+        lifecycleObservers = []
         chat.stop()
         status.cancelAutoHide()
         mediaPlayer.delegate = nil
@@ -609,5 +625,26 @@ final class VLCLivePlayerViewController: UIViewController, PlayerTeardown, VLCMe
             player.stop()
             player.media = nil
         }
+    }
+}
+
+/// 画中画 for live rooms (HLS); chat stays connected while it's in the corner, though it isn't drawn there.
+extension LivePlayerViewController: AVPlayerViewControllerDelegate {
+    func playerViewControllerWillStartPictureInPicture(_: AVPlayerViewController) {
+        PictureInPicture.willStart(self)
+    }
+
+    func playerViewControllerDidStopPictureInPicture(_: AVPlayerViewController) {
+        PictureInPicture.didStop(self)
+    }
+
+    func playerViewController(_: AVPlayerViewController, failedToStartPictureInPictureWithError _: Error) {
+        PictureInPicture.didStop(self)
+    }
+
+    func playerViewController(_: AVPlayerViewController,
+                              restoreUserInterfaceForPictureInPictureStopWithCompletionHandler completionHandler: @escaping (Bool) -> Void)
+    {
+        PictureInPicture.restore(self, completion: completionHandler)
     }
 }

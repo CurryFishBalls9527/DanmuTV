@@ -8,6 +8,7 @@ struct DanmuTVApp: App {
 
     init() {
         URLCache.shared = URLCache(memoryCapacity: 64 << 20, diskCapacity: 512 << 20)
+        PictureInPicture.configureAudioSession()
         // Another profile's 继续观看 must not stay on the Home screen; the home shelf rewrites it for the new one.
         NotificationCenter.default.addObserver(forName: .accountChanged, object: nil, queue: .main) { _ in
             MainActor.assumeIsolated { TopShelf.update([]) }
@@ -28,6 +29,10 @@ struct DanmuTVApp: App {
 
 struct RootView: View {
     enum Tab: Hashable, CaseIterable { case recommend, popular, ranking, dynamic, live, bangumi, search, me }
+
+    #if DEBUG
+    @MainActor private static var launchLinkHandled = false
+    #endif
 
     @Environment(AppSettings.self) private var settings
     @Environment(AccountStore.self) private var accounts
@@ -91,7 +96,9 @@ struct RootView: View {
         .task {
             #if DEBUG
             // Lets `simctl launch … -deeplink danmutv://…` drive the UI without the "Open in" prompt.
-            if let link = UserDefaults.standard.string(forKey: "deeplink"), let url = URL(string: link) {
+            // Once per launch: the task runs again when the root reappears (e.g. AVKit dismissing a player for 画中画).
+            if !Self.launchLinkHandled, let link = UserDefaults.standard.string(forKey: "deeplink"), let url = URL(string: link) {
+                Self.launchLinkHandled = true
                 handleDeepLink(url)
             }
             #endif
@@ -120,6 +127,13 @@ struct RootView: View {
         }
         // The app's only login sheet; every entry point sets `accounts.isLoginPresented`.
         .sheet(isPresented: $accounts.isLoginPresented) { LoginView() }
+        // tvOS 多用户: an Apple TV user's first launch picks their Bilibili profile.
+        .fullScreenCover(isPresented: $accounts.needsProfileChoice, onDismiss: {
+            if accounts.loginAfterProfileChoice {
+                accounts.loginAfterProfileChoice = false
+                accounts.isLoginPresented = true
+            }
+        }) { ProfileChoiceView().environment(accounts) }
         .onOpenURL(perform: handleDeepLink)
     }
 

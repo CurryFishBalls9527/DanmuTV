@@ -1,6 +1,7 @@
 import BiliKit
 import Foundation
 import Observation
+import TVServices
 
 /// Up to `maxProfiles` logged-in Bilibili accounts. Each account is its own Keychain item
 /// (`account.<mid>`), optionally in iCloud Keychain so profiles sync between Apple TVs.
@@ -22,6 +23,11 @@ final class AccountStore {
 
     /// Drives the app's single QR-login sheet (add profile, re-login after expiry, deep link).
     var isLoginPresented = false
+    /// tvOS 多用户: this Apple TV user opens the app for the first time and there are profiles to choose from
+    /// (「谁在看？」). Their choice is remembered for them (settings are per user), so later it's automatic.
+    var needsProfileChoice = false
+    /// 「登录其他账号」 was picked: login opens once the question's cover has gone (a sheet can't open while it leaves).
+    var loginAfterProfileChoice = false
     var currentNeedsReLogin: Bool { currentID.map { expiredIDs.contains($0) } ?? false }
     private var isVerifyingAuth = false
 
@@ -35,8 +41,26 @@ final class AccountStore {
             Keychain.adoptItems(prefix: Self.itemPrefix)
             UserDefaults.standard.set(true, forKey: "keychain.adopted.danmutv")
         }
+        if Keychain.userIndependent, !UserDefaults.standard.bool(forKey: "keychain.adopted.userIndependent") {
+            // Retried next launch if anything couldn't be copied.
+            if Keychain.adoptUserItems(prefix: Self.itemPrefix) { UserDefaults.standard.set(true, forKey: "keychain.adopted.userIndependent") }
+        }
         expiredIDs = Set(UserDefaults.standard.array(forKey: Self.reLoginKey) as? [Int] ?? [])
+        let chosenBefore = UserDefaults.standard.object(forKey: Self.currentKey) != nil
         reload()
+        Log.account.info("profiles: \(self.accounts.count), user-independent keychain: \(Keychain.userIndependent), chosen before: \(chosenBefore)")
+        needsProfileChoice = Keychain.userIndependent && TVUserManager().shouldStorePreferencesForCurrentUser
+            && !chosenBefore && !accounts.isEmpty
+        #if DEBUG
+        // UI tests: `-forceProfileChoice YES` shows the question whatever the device.
+        if UserDefaults.standard.bool(forKey: "forceProfileChoice") { needsProfileChoice = true }
+        #endif
+    }
+
+    /// 「谁在看？」 answered (or dismissed: then the profile shown stays, and the question isn't asked again).
+    func profileChosen(_ mid: Int?) {
+        needsProfileChoice = false
+        if let mid { switchTo(mid) } else if let currentID { UserDefaults.standard.set(currentID, forKey: Self.currentKey) }
     }
 
     /// Re-reads the Keychain (picks up profiles / rotated tokens synced from other devices).

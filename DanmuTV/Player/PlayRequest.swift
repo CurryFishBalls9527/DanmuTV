@@ -173,12 +173,13 @@ enum PlayerLauncher {
 
     /// Presents a player (VOD or live). Any player already open is torn down first, so audio,
     /// chat sockets and progress reports never keep running underneath (players never stack).
-    static func present(_ controller: UIViewController) {
+    static func present(_ controller: UIViewController, animated: Bool = true, completion: (() -> Void)? = nil) {
+        PictureInPicture.end(except: controller)
         guard let root = rootViewController() else {
             // Cold launch from Top Shelf: the window may not exist yet.
             Task {
                 try? await Task.sleep(nanoseconds: 500_000_000)
-                if rootViewController() != nil { present(controller) }
+                if rootViewController() != nil { present(controller, animated: animated, completion: completion) } else { completion?() }
             }
             return
         }
@@ -189,13 +190,13 @@ enum PlayerLauncher {
             node = n.presentedViewController
         }
         if chain.isEmpty {
-            root.present(controller, animated: true)
+            root.present(controller, animated: animated, completion: completion)
             return
         }
         isReplacingPlayer = true
         chain.compactMap { $0 as? PlayerTeardown }.forEach { $0.teardown() }
         isReplacingPlayer = false
-        root.dismiss(animated: false) { root.present(controller, animated: true) }
+        root.dismiss(animated: false) { root.present(controller, animated: animated, completion: completion) }
     }
 
     /// Whether a player (VOD or live) is on screen.

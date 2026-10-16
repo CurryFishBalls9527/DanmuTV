@@ -147,6 +147,7 @@ struct SettingsView: View {
                 }
                 Toggle("合并重复弹幕", isOn: $settings.danmakuMerge)
                 Toggle("智能防挡（人物不被弹幕遮挡）", isOn: $settings.danmakuMask)
+                Toggle("高能进度条", isOn: $settings.heatBar)
             } header: {
                 Text("弹幕")
             }
@@ -220,7 +221,11 @@ struct SettingsView: View {
             } header: {
                 Text("账户")
             } footer: {
-                if accounts.accounts.isEmpty { Text("在「我的」里扫码登录。") }
+                if accounts.accounts.isEmpty {
+                    Text("在「我的」里扫码登录。")
+                } else if Keychain.userIndependent {
+                    Text("这台 Apple TV 的所有用户共用这些账号，每位用户第一次打开时在「谁在看？」里选自己的账号。")
+                }
             }
 
             Section {

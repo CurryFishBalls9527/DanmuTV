@@ -1,5 +1,29 @@
 import Foundation
 
+/// A picture attached to a comment.
+public struct CommentPicture: Hashable, Sendable {
+    public var url: String
+    public var width: Int
+    public var height: Int
+
+    public init(url: String, width: Int = 0, height: Int = 0) {
+        self.url = url
+        self.width = width
+        self.height = height
+    }
+}
+
+/// Sort order of a video's comments.
+public enum CommentSort: String, CaseIterable, Identifiable, Hashable, Sendable {
+    /// 热门 (the web's default; the uploader's pinned comment leads).
+    case hot
+    /// 最新.
+    case newest
+
+    public var id: Self { self }
+    public var title: String { self == .hot ? "按热度" : "按时间" }
+}
+
 /// A comment (评论) or a reply to one.
 public struct Comment: Identifiable, Hashable, Sendable {
     /// rpid.
@@ -28,13 +52,16 @@ public struct Comment: Identifiable, Hashable, Sendable {
     public var liked: Bool
     /// The first few replies, as shown under the comment.
     public var previewReplies: [Comment]
-    /// Attached pictures (not shown on TV; a picture-only comment says so).
-    public var pictureCount: Int
+    /// Attached pictures.
+    public var pictures: [CommentPicture]
+    /// Emote images by their text, e.g. "[doge]" → URL.
+    public var emotes: [String: String]
+    public var pictureCount: Int { pictures.count }
 
     public init(id: Int, mid: Int = 0, name: String, face: String = "", level: Int = 0, isVIP: Bool = false, message: String,
                 likes: Int = 0, replyCount: Int = 0, time: Int = 0, timeText: String = "", location: String = "",
                 isPinned: Bool = false, upLiked: Bool = false, liked: Bool = false, previewReplies: [Comment] = [],
-                pictureCount: Int = 0)
+                pictures: [CommentPicture] = [], emotes: [String: String] = [:])
     {
         self.id = id
         self.mid = mid
@@ -52,13 +79,50 @@ public struct Comment: Identifiable, Hashable, Sendable {
         self.upLiked = upLiked
         self.liked = liked
         self.previewReplies = previewReplies
-        self.pictureCount = pictureCount
+        self.pictures = pictures
+        self.emotes = emotes
     }
 
-    /// The text to show: the message, or a note for picture-only comments.
+    /// The text to show: the message, or a note for picture-only comments (pictures show beside it where there's room).
     public var displayText: String {
         if message.isEmpty { return pictureCount > 0 ? "[图片 ×\(pictureCount)]" : "" }
-        return pictureCount > 0 ? message + "  [图片]" : message
+        return message
+    }
+
+    /// The message cut into text and emotes (only the ones the comment has images for), in order.
+    public var segments: [Segment] {
+        let text = displayText
+        guard !emotes.isEmpty, text.contains("[") else { return text.isEmpty ? [] : [.text(text)] }
+        var out: [Segment] = []
+        var rest = Substring(text)
+        while let open = rest.firstIndex(of: "["), let close = rest[open...].firstIndex(of: "]") {
+            let key = String(rest[open ... close])
+            if let url = emotes[key] {
+                if open > rest.startIndex { out.append(.text(String(rest[..<open]))) }
+                out.append(.emote(key, url))
+                rest = rest[rest.index(after: close)...]
+            } else {
+                // Not an emote: keep the bracket as text and look further on.
+                let next = rest.index(after: open)
+                out.append(.text(String(rest[..<next])))
+                rest = rest[next...]
+            }
+        }
+        if !rest.isEmpty { out.append(.text(String(rest))) }
+        // Merge neighbouring text pieces.
+        return out.reduce(into: []) { merged, piece in
+            if case let .text(b) = piece, case let .text(a)? = merged.last {
+                merged[merged.count - 1] = .text(a + b)
+            } else {
+                merged.append(piece)
+            }
+        }
+    }
+
+    public enum Segment: Hashable, Sendable {
+        case text(String)
+        /// Its text ("[doge]") and image URL.
+        case emote(String, String)
     }
 
     init(_ j: JSON, pinned: Bool = false) {
@@ -80,7 +144,14 @@ public struct Comment: Identifiable, Hashable, Sendable {
                   upLiked: j["up_action"]["like"].bool,
                   liked: j["action"].intValue == 1,
                   previewReplies: j["replies"].array.map { Comment($0) },
-                  pictureCount: j["content"]["pictures"].array.count)
+                  pictures: j["content"]["pictures"].array.compactMap { p in
+                      let url = BiliText.imageURL(p["img_src"].stringValue)
+                      return url.isEmpty ? nil : CommentPicture(url: url, width: p["img_width"].intValue, height: p["img_height"].intValue)
+                  },
+                  emotes: j["content"]["emote"].dictionary.reduce(into: [:]) { out, pair in
+                      let url = BiliText.imageURL(pair.value["url"].stringValue)
+                      if !url.isEmpty { out[pair.key] = url }
+                  })
     }
 
     /// Trims the whitespace runs people paste in, keeping paragraph breaks.
@@ -105,16 +176,16 @@ extension API {
     /// `nextOffset` ("" for the first page, where the uploader's pinned comment leads). Signed (wbi): unsigned
     /// requests get -352 after a page or two. If the signed endpoint fails on the first page, the legacy one
     /// (most liked, only 3 when logged out) stands in.
-    public static func comments(aid: Int, offset: String = "") async throws -> (page: CommentPage, nextOffset: String?) {
+    public static func comments(aid: Int, offset: String = "", sort: CommentSort = .hot) async throws -> (page: CommentPage, nextOffset: String?) {
         let pagination = (try? JSONSerialization.data(withJSONObject: ["offset": offset])).flatMap { String(data: $0, encoding: .utf8) } ?? "{\"offset\":\"\"}"
         do {
             let d = try await client.get("https://api.bilibili.com/x/v2/reply/wbi/main",
-                                         ["oid": String(aid), "type": "1", "mode": "3", "pagination_str": pagination,
+                                         ["oid": String(aid), "type": "1", "mode": sort == .hot ? "3" : "2", "pagination_str": pagination,
                                           "plat": "1", "web_location": "1315875"], sign: .wbi)["data"]
             return mainPage(d, first: offset.isEmpty)
         } catch where offset.isEmpty && !BiliClient.isCancellation(error) {
             let d = try await client.get("https://api.bilibili.com/x/v2/reply",
-                                         ["type": "1", "oid": String(aid), "sort": "1", "ps": "20", "pn": "1"])["data"]
+                                         ["type": "1", "oid": String(aid), "sort": sort == .hot ? "1" : "0", "ps": "20", "pn": "1"])["data"]
             return (legacyPage(d), nil)
         }
     }

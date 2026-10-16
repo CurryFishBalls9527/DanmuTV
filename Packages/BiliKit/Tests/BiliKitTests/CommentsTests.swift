@@ -66,3 +66,32 @@ final class CommentsTests: XCTestCase {
         XCTAssertEqual(c.displayText, "[图片 ×2]")
     }
 }
+
+final class CommentRichContentTests: XCTestCase {
+    private func comment(_ content: [String: Any]) -> Comment {
+        Comment(JSON(["rpid": 1, "mid": 2, "member": ["uname": "a"], "content": content] as [String: Any]))
+    }
+
+    func testPicturesAndEmotesParse() {
+        let c = comment(["message": "好耶[doge][未知]！[doge]",
+                         "emote": ["[doge]": ["text": "[doge]", "url": "http://i0.hdslb.com/bfs/emote/doge.png"]],
+                         "pictures": [["img_src": "//i0.hdslb.com/bfs/new_dyn/p.jpg", "img_width": 1080, "img_height": 1920]]])
+        XCTAssertEqual(c.pictures, [CommentPicture(url: "https://i0.hdslb.com/bfs/new_dyn/p.jpg", width: 1080, height: 1920)])
+        XCTAssertEqual(c.emotes["[doge]"], "https://i0.hdslb.com/bfs/emote/doge.png")
+        let url = "https://i0.hdslb.com/bfs/emote/doge.png"
+        XCTAssertEqual(c.segments, [.text("好耶"), .emote("[doge]", url), .text("[未知]！"), .emote("[doge]", url)])
+        XCTAssertEqual(c.displayText, "好耶[doge][未知]！[doge]")
+    }
+
+    func testPlainAndPictureOnly() {
+        XCTAssertEqual(comment(["message": "a [b] c"]).segments, [.text("a [b] c")])
+        let pictureOnly = comment(["message": "", "pictures": [["img_src": "https://x/1.jpg"], ["img_src": "https://x/2.jpg"]]])
+        XCTAssertEqual(pictureOnly.displayText, "[图片 ×2]")
+        XCTAssertEqual(pictureOnly.segments, [.text("[图片 ×2]")])
+    }
+
+    func testUnclosedBracket() {
+        let c = comment(["message": "[doge] [oops", "emote": ["[doge]": ["url": "https://e/d.png"]]])
+        XCTAssertEqual(c.segments, [.emote("[doge]", "https://e/d.png"), .text(" [oops")])
+    }
+}

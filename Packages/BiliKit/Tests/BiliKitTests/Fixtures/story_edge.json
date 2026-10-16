@@ -1,0 +1,13 @@
+{"code":0,"message":"0","ttl":1,"data":{"title":"4","edge_id":5556092,
+"story_list":[{"node_id":1,"edge_id":1,"title":"0 片头","cid":127486603,"start_pos":27000,"cursor":0},
+{"node_id":5556092,"edge_id":5556092,"title":"4","cid":125499378,"start_pos":82000,"is_current":1,"cursor":15}],
+"edges":{"dimension":{"width":1920,"height":1000,"rotate":0,"sar":""},
+"questions":[{"id":0,"type":2,"start_time_r":300,"duration":-1,"pause_video":1,"title":"","choices":[
+{"id":5556133,"platform_action":"JUMP 5556133 125499249","native_action":"","condition":"$H7g_64_PG2EVS>=1.00 && $H7g_64_PG2EVS<=80.00","cid":125499249,"x":947,"y":499,"text_align":2,"option":"A 试图砍死萌新 (成功率20%)","is_default":1},
+{"id":5556134,"platform_action":"JUMP 5556134 125502707","native_action":"","condition":"$H7g_64_PG2EVS>=81.00 && $H7g_64_PG2EVS<=100.00","cid":125502707,"x":949,"y":502,"text_align":2,"option":"B 试图砍死萌新 (成功率20%)"},
+{"id":5556135,"platform_action":"JUMP 5556135 125499249","native_action":"","condition":"","cid":125499249,"x":120,"y":145,"text_align":2,"option":"C 直接【砍杀失败】"}]}],
+"skin":{"title_text_color":"d8fbffff"}},
+"preload":{"video":[{"aid":73267982,"cid":125499249}]},
+"hidden_vars":[{"value":42,"id":"v1","id_v2":"H7g_64_PG2EVS","type":2,"is_show":0,"name":"随机","skip_overwrite":0},
+{"value":10,"id":"v2","id_v2":"score","type":1,"is_show":1,"name":"分数","skip_overwrite":0}],
+"is_leaf":0}}
