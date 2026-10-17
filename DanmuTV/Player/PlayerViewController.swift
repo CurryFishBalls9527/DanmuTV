@@ -42,6 +42,9 @@ final class PlayerViewController: AVPlayerViewController, PlayerTeardown {
     private var finishedReported = false
     /// True while the next page's item is loading (the old item is still attached).
     private var isSwitchingPage = false
+    /// What the attached item plays: a switch that fails goes back to it, so progress isn't saved under the page
+    /// (or video) that never loaded.
+    private var attachedRequest: PlayRequest?
     private let overlay = PlayerOverlayView()
     /// 高能进度条 above the scrubber (shown with the transport bar), and its busiest moments as markers.
     private let heatBar = HeatBarView()
@@ -226,6 +229,9 @@ final class PlayerViewController: AVPlayerViewController, PlayerTeardown {
 
     private func startLoading(_ start: StartPosition) {
         loadTask?.cancel()
+        // A reload (quality, codec) while the next page is loading: "where it is now" is the old page's time.
+        var start = start
+        if isSwitchingPage, case .current = start { start = .resume }
         loadTask = Task { [weak self] in await self?.load(start) }
     }
 
@@ -327,6 +333,7 @@ final class PlayerViewController: AVPlayerViewController, PlayerTeardown {
             } else {
                 showAlert(title: "无法播放", message: error.localizedDescription)
             }
+            if player?.currentItem != nil, let attachedRequest { request = attachedRequest }
         }
     }
 
@@ -392,6 +399,7 @@ final class PlayerViewController: AVPlayerViewController, PlayerTeardown {
         teardownItem()
         loader = newLoader
         isSwitchingPage = false
+        attachedRequest = request
         if let player {
             player.replaceCurrentItem(with: item)
         } else {
@@ -1316,7 +1324,7 @@ extension PlayerViewController: CastControllable {
     }
 
     func castSeek(to seconds: Double) {
-        guard seconds.isFinite, seconds >= 0 else { return }
+        guard seconds.isFinite, seconds >= 0, seconds < 1e9 else { return }
         guard let player, player.currentItem != nil, !isSwitchingPage else {
             // Still loading: start there instead (read when the item attaches).
             request.startAt = seconds

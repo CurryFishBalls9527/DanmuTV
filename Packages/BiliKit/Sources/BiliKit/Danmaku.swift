@@ -224,12 +224,16 @@ public struct DanmakuTimeline: Sendable {
         if let window = mergeWindow, let first = incoming.first?.time {
             var recent: [String: Int] = [:]
             var i = items.count - 1
+            // Only what came just before this segment: a later segment already loaded (seeked ahead, then back)
+            // isn't a repeat of these.
+            while i >= 0, items[i].time > first { i -= 1 }
             while i >= 0, items[i].time >= first - window {
                 recent[DanmakuMerger.key(items[i])] = recent[DanmakuMerger.key(items[i])] ?? i
                 i -= 1
             }
             incoming = incoming.filter { d in
-                guard let j = recent[DanmakuMerger.key(d)], d.time - items[j].time <= window else { return true }
+                guard let j = recent[DanmakuMerger.key(d)], case let gap = d.time - items[j].time, gap >= 0, gap <= window
+                else { return true }
                 items[j].count += d.count
                 return false
             }

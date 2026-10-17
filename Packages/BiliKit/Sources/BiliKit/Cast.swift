@@ -177,7 +177,8 @@ public struct CastRequest: Equatable, Sendable {
     /// Field names vary by client version: `seekTs` / `sk`, `epid` / `epId` / `eid`, `season_id` / `seasonId` / `sid`.
     static func parse(_ json: JSON) -> CastRequest? {
         func first(_ keys: String...) -> Int { keys.lazy.compactMap { json[$0].int }.first { $0 > 0 } ?? 0 }
-        let startAt = max(0, json["seekTs"].double ?? json["sk"].double ?? 0)
+        let seek = json["seekTs"].double ?? json["sk"].double ?? 0
+        let startAt = seek.isFinite && seek > 0 && seek < 1e9 ? seek : 0
         let roomID = first("roomId", "room_id")
         if roomID > 0 {
             return CastRequest(content: .live(roomID: roomID))

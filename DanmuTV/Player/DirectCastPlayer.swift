@@ -72,10 +72,12 @@ final class DirectCastPlayer: AVPlayerViewController, PlayerTeardown, CastContro
     func castResume() { player?.play() }
 
     func castSeek(to seconds: Double) {
+        guard seconds.isFinite, seconds < 1e9 else { return }
         player?.seek(to: CMTime(seconds: max(0, seconds), preferredTimescale: 600))
     }
 
     func castSetSpeed(_ rate: Double) {
+        guard rate.isFinite, (0.25 ... 4).contains(rate) else { return }
         player?.defaultRate = Float(rate)
         if player?.rate ?? 0 > 0 { player?.rate = Float(rate) }
     }

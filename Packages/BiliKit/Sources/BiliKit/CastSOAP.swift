@@ -44,16 +44,38 @@ public enum SOAP {
         """
     }
 
+    /// The phone's URI without `_nva_ext_` (it carries the account's access key), for echoing back to any sender.
+    public static func redactingNvaExt(uri: String) -> String {
+        guard var components = URLComponents(string: uri), let items = components.queryItems else { return uri }
+        let kept = items.filter { !["_nva_ext_", "nva_ext"].contains($0.name) }
+        guard kept.count != items.count else { return uri }
+        components.queryItems = kept.isEmpty ? nil : kept
+        return components.string ?? ""
+    }
+
+    /// DIDL metadata without the `longDescription` (where newer phones put `_nva_ext_`), escaped or not.
+    public static func redactingNvaExt(metadata: String) -> String {
+        func strip(_ xml: String) -> String {
+            guard let regex = try? NSRegularExpression(pattern: "(<(?:[A-Za-z0-9_.-]+:)?longDescription\\b[^>]*>).*?(</(?:[A-Za-z0-9_.-]+:)?longDescription>)",
+                                                       options: [.dotMatchesLineSeparators, .caseInsensitive]) else { return "" }
+            return regex.stringByReplacingMatches(in: xml, range: NSRange(xml.startIndex..., in: xml), withTemplate: "$1$2")
+        }
+        let inner = unescape(metadata)
+        return inner == metadata ? strip(metadata) : escape(strip(inner))
+    }
+
     /// "01:02:03" / "1:02:03.500" → seconds.
     public static func seconds(fromTime text: String) -> Double? {
         let parts = text.trimmingCharacters(in: .whitespaces).split(separator: ":").map { Double($0) }
         guard !parts.isEmpty, parts.allSatisfy({ $0 != nil }) else { return nil }
-        return parts.compactMap { $0 }.reduce(0) { $0 * 60 + $1 }
+        let value = parts.compactMap { $0 }.reduce(0) { $0 * 60 + $1 }
+        // From the network: "nan", "1e300" and negatives aren't positions.
+        return value.isFinite && value >= 0 && value < 1e9 ? value : nil
     }
 
     /// Seconds → "hh:mm:ss".
     public static func time(_ seconds: Double) -> String {
-        let s = max(0, Int(seconds.isFinite ? seconds : 0))
+        let s = seconds.isFinite ? Int(min(max(0, seconds), 1e9)) : 0
         return String(format: "%02d:%02d:%02d", s / 3600, s / 60 % 60, s % 60)
     }
 }
