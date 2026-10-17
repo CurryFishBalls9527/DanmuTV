@@ -8,5 +8,8 @@ APP_BUNDLE_ID = com.example.DanmuTV
 // App Group for Top Shelf 继续观看. Free (personal) teams can't sign App Groups: set NO in Local.xcconfig;
 // everything else works, Top Shelf then shows 热门 only.
 DANMUTV_APP_GROUP = YES
+// tvOS 多用户 (each Apple TV user picks their B站 account once; needs the User Management capability on the App ID,
+// which automatic signing can't add yet). YES in Local.xcconfig signs with the *-MultiUser.entitlements files.
+DANMUTV_MULTIUSER = NO
 
 #include? "Local.xcconfig"

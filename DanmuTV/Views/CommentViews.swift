@@ -126,12 +126,12 @@ struct CommentCard: View {
     let comment: Comment
     var lineLimit: Int = 4
     var messageFont: Font = Theme.Font.body
+    var messageSize: CGFloat = 29
 
     var body: some View {
         VStack(alignment: .leading, spacing: Theme.Spacing.s) {
             CommentAuthor(comment: comment)
-            Text(comment.displayText)
-                .font(messageFont)
+            CommentText(comment: comment, font: messageFont, size: messageSize)
                 .lineLimit(lineLimit)
                 .lineSpacing(6)
                 .frame(maxWidth: .infinity, alignment: .leading)
@@ -179,6 +179,9 @@ struct CommentFooter: View {
             if comment.replyCount > 0 {
                 Label(BiliText.formatCount(comment.replyCount), systemImage: "bubble.left")
             }
+            if comment.pictureCount > 0, !comment.message.isEmpty {
+                Label("\(comment.pictureCount)", systemImage: "photo")
+            }
             if comment.upLiked {
                 Text("UP 主觉得很赞").foregroundStyle(Theme.accent)
             }
@@ -192,21 +195,28 @@ struct CommentFooter: View {
     }
 }
 
-/// Every comment, most liked first, two to a row.
+/// Every comment, 按热度 (the default) or 按时间, two to a row.
 struct CommentsPage: View {
     let route: CommentsRoute
     /// Page N's cursor comes from page N - 1.
     @State private var cursor = OffsetCursor()
+    @State private var sort: CommentSort = .hot
+    /// Read by the grid's fetcher, so the sort changes without rebuilding the grid (and losing focus).
+    @State private var sortBox = CommentSortBox()
 
     var body: some View {
-        let cursor = cursor
-        PagedGrid(columns: 2, aspect: 2.25, emptyMessage: "还没有评论", fetch: { page in
+        let (cursor, box) = (cursor, sortBox)
+        PagedGrid(columns: 2, aspect: 2.25, emptyMessage: "还没有评论", refreshKey: sort, fetch: { page in
             let generation = cursor.begin(page: page)
-            let r = try await API.comments(aid: route.aid, offset: cursor.offset(for: page))
+            let r = try await API.comments(aid: route.aid, offset: cursor.offset(for: page), sort: box.sort)
             cursor.commit(page: page, generation: generation, offset: r.nextOffset ?? "")
             return (r.page.comments, r.page.hasMore)
         }, header: {
-            PageTitle(title: "评论", subtitle: route.title)
+            VStack(alignment: .leading, spacing: 0) {
+                PageTitle(title: "评论", subtitle: route.title)
+                ChipRow(items: CommentSort.allCases, selection: $sort, leadingInset: Theme.pagePadding, focusesByDefault: true) { Text($0.title) }
+            }
+            .focusSection()
         }, card: { comment in
             NavigationLink(value: CommentThreadRoute(aid: route.aid, comment: comment)) {
                 CommentCard(comment: comment, lineLimit: 5)
@@ -214,7 +224,13 @@ struct CommentsPage: View {
             }
             .buttonStyle(.card)
         })
+        .onChange(of: sort) { sortBox.sort = sort }
     }
+}
+
+@MainActor
+final class CommentSortBox {
+    var sort: CommentSort = .hot
 }
 
 /// A comment in full, with 点赞 and its replies below. The like button sits above the text, so the page opens
@@ -271,11 +287,15 @@ private struct CommentThreadHeader: View {
                 .foregroundStyle(Theme.textSecondary)
                 .lineLimit(1)
             }
-            Text(comment.displayText)
-                .font(Theme.Font.headline.weight(.regular))
-                .lineSpacing(10)
-                .fixedSize(horizontal: false, vertical: true)
-                .frame(maxWidth: 1400, alignment: .leading)
+            if !comment.message.isEmpty || comment.pictures.isEmpty {
+                CommentText(comment: comment, font: Theme.Font.headline.weight(.regular), size: 31)
+                    .lineSpacing(10)
+                    .fixedSize(horizontal: false, vertical: true)
+                    .frame(maxWidth: 1400, alignment: .leading)
+            }
+            if !comment.pictures.isEmpty {
+                CommentPictureRow(pictures: comment.pictures)
+            }
             if comment.replyCount > 0 {
                 SectionHeader(title: "回复", subtitle: "共 \(comment.replyCount) 条").padding(.horizontal, -Theme.pagePadding)
                     .padding(.top, Theme.Spacing.m)
@@ -316,7 +336,7 @@ private struct ReplyCard: View {
     @FocusState private var focused: Bool
 
     var body: some View {
-        CommentCard(comment: comment, lineLimit: 12, messageFont: Theme.Font.meta)
+        CommentCard(comment: comment, lineLimit: 12, messageFont: Theme.Font.meta, messageSize: 23)
             .clipShape(RoundedRectangle(cornerRadius: Theme.Radius.card, style: .continuous))
             .overlay(RoundedRectangle(cornerRadius: Theme.Radius.card, style: .continuous)
                 .stroke(.white.opacity(focused ? 0.7 : 0), lineWidth: 3))

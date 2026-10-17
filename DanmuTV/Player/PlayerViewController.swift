@@ -43,6 +43,13 @@ final class PlayerViewController: AVPlayerViewController, PlayerTeardown {
     /// True while the next page's item is loading (the old item is still attached).
     private var isSwitchingPage = false
     private let overlay = PlayerOverlayView()
+    /// 高能进度条 above the scrubber (shown with the transport bar), and its busiest moments as markers.
+    private let heatBar = HeatBarView()
+    private var heatMarkers: [AVTimedMetadataGroup] = []
+    /// 互动视频: the story being played (nil for ordinary videos), and whether a module ended waiting for a choice.
+    private var story: StorySession?
+    private var storyTask: Task<Void, Never>?
+    private var awaitingStoryChoice = false
     private var subtitles: [API.Subtitle] = []
     private var selectedSubtitle: API.Subtitle?
     private var subtitleTask: Task<Void, Never>?
@@ -95,14 +102,18 @@ final class PlayerViewController: AVPlayerViewController, PlayerTeardown {
     override func viewDidLoad() {
         super.viewDidLoad()
         appliesPreferredDisplayCriteriaAutomatically = false
+        allowsPictureInPicturePlayback = true
+        Log.player.info("picture in picture supported: \(AVPictureInPictureController.isPictureInPictureSupported())")
         #if DEBUG
         _ = initialPageIndex
         #endif
         // The TV button backgrounds the app without dismissing the player: save progress then.
         backgroundObserver = NotificationCenter.default.addObserver(forName: UIApplication.didEnterBackgroundNotification, object: nil, queue: .main) { [weak self] _ in
             MainActor.assumeIsolated {
-                self?.reportProgress()
-                self?.player?.pause()
+                guard let self else { return }
+                self.reportProgress()
+                // In picture in picture it keeps playing over the other app.
+                if !PictureInPicture.keeps(self) { self.player?.pause() }
             }
         }
         overlay.frame = contentOverlayView?.bounds ?? view.bounds
@@ -121,6 +132,10 @@ final class PlayerViewController: AVPlayerViewController, PlayerTeardown {
             return (player.currentTime().seconds, Double(player.rate))
         }
         contentOverlayView?.addSubview(overlay)
+        // Above AVKit's controls (it only draws while they're up), so the transport bar's shade doesn't dim it.
+        heatBar.alpha = 0
+        view.addSubview(heatBar)
+        delegate = self
         #if DEBUG
         testMarker.isAccessibilityElement = true
         testMarker.accessibilityIdentifier = "player.state"
@@ -141,6 +156,20 @@ final class PlayerViewController: AVPlayerViewController, PlayerTeardown {
     override func viewDidLayoutSubviews() {
         super.viewDidLayoutSubviews()
         applyMirror()
+        heatBar.frame = Self.heatBarFrame(in: view.bounds)
+    }
+
+    /// Just above the system scrubber, matching its length (tvOS 26 transport bar, measured at 1920×1080).
+    static func heatBarFrame(in bounds: CGRect) -> CGRect {
+        let scale = bounds.width / 1920
+        return CGRect(x: 84 * scale, y: bounds.height - 214 * scale, width: bounds.width - 168 * scale, height: 36 * scale)
+    }
+
+    override func viewDidAppear(_ animated: Bool) {
+        super.viewDidAppear(animated)
+        // Back from 画中画: the TV's output mode was handed back when the player left the screen.
+        if playInfo != nil { applyDisplayPlan() }
+        if awaitingStoryChoice { showStoryChoices() }
     }
 
     override func viewWillDisappear(_ animated: Bool) {
@@ -156,7 +185,7 @@ final class PlayerViewController: AVPlayerViewController, PlayerTeardown {
 
     override func viewDidDisappear(_ animated: Bool) {
         super.viewDidDisappear(animated)
-        guard isBeingDismissed || presentingViewController == nil else { return }
+        guard isBeingDismissed || presentingViewController == nil, !PictureInPicture.keeps(self) else { return }
         teardown()
     }
 
@@ -171,6 +200,7 @@ final class PlayerViewController: AVPlayerViewController, PlayerTeardown {
         loadTask?.cancel()
         subtitleTask?.cancel()
         relatedTask?.cancel()
+        storyTask?.cancel()
         reportProgress()
         teardownItem()
         if let backgroundObserver { NotificationCenter.default.removeObserver(backgroundObserver) }
@@ -467,7 +497,7 @@ final class PlayerViewController: AVPlayerViewController, PlayerTeardown {
         let status = player.map { ["paused", "waiting", "playing"][min(2, $0.timeControlStatus.rawValue)] } ?? "none"
         let seconds = player?.currentTime().seconds ?? 0
         let position = seconds.isFinite ? Int(seconds) : 0
-        testMarker.accessibilityValue = "bvid=\(request.bvid);rate=\(player?.rate ?? 0);status=\(status);boost=\(lastBoost);pos=\(position);cid=\(request.cid);id=\(ObjectIdentifier(self).hashValue);mask=\(overlay.appliedMaskTime)"
+        testMarker.accessibilityValue = "bvid=\(request.bvid);rate=\(player?.rate ?? 0);status=\(status);boost=\(lastBoost);pos=\(position);cid=\(request.cid);id=\(ObjectIdentifier(self).hashValue);mask=\(overlay.appliedMaskTime);dur=\(Int(playInfo?.duration ?? 0));story=\(story?.edge.edgeID ?? -1);depth=\(story?.history.count ?? 0)"
     }
     #endif
 
@@ -526,6 +556,10 @@ final class PlayerViewController: AVPlayerViewController, PlayerTeardown {
         }
         reportProgress(finished: true)
         if CastReceiver.shared.player === self { CastReceiver.shared.playerStateChanged(.ended) }
+        if story != nil {
+            showStoryChoices()
+            return
+        }
         if request.hasNextPage {
             if AppSettings.shared.autoPlayNext { playPage(request.pageIndex + 1) }
         } else if let next = relatedNext, AppSettings.shared.autoPlayRelated {
@@ -563,12 +597,16 @@ final class PlayerViewController: AVPlayerViewController, PlayerTeardown {
             }
             self.request = PlayRequest(detail: detail, pageIndex: 0, resumeLastPage: true)
             self.sponsorSkips = (0, [])
+            self.endStory()
             self.startLoading(.resume)
         }
     }
 
     /// State that belongs to the page being left.
     private func beginSwitch() {
+        // The next page has its own 高能时刻 (the current item is re-marked before its extras load).
+        heatMarkers = []
+        heatBar.set(nil, duration: 0)
         boostedFrom = nil
         overlay.setBoost(nil)
         extrasCID = 0
@@ -587,6 +625,11 @@ final class PlayerViewController: AVPlayerViewController, PlayerTeardown {
     /// one-press 下一P/下一集 button, which becomes the 即将播放 prompt near the end.
     private func updateContextualActions(upNext: Bool, skip: SkipRange? = nil) {
         var actions: [UIAction] = []
+        if awaitingStoryChoice {
+            actions.append(UIAction(title: "选择剧情", image: UIImage(systemName: "arrow.triangle.branch")) { [weak self] _ in
+                self?.showStoryChoices()
+            })
+        }
         if let skip {
             actions.append(UIAction(title: Self.skipLabel(skip.kind, past: false), image: UIImage(systemName: "forward.fill")) { [weak self] _ in
                 self?.skipped.insert(skip)
@@ -600,7 +643,7 @@ final class PlayerViewController: AVPlayerViewController, PlayerTeardown {
                 guard let self else { return }
                 self.playPage(self.request.pageIndex + 1)
             })
-        } else if upNext, let next = relatedNext, !isSwitchingPage {
+        } else if upNext, let next = relatedNext, !isSwitchingPage, story == nil {
             // Only near the end: a permanent button for an unrelated video would be noise.
             actions.append(UIAction(title: "即将播放 " + next.title, image: UIImage(systemName: "forward.end.fill")) { [weak self] _ in
                 self?.playRelated(next)
@@ -641,6 +684,7 @@ final class PlayerViewController: AVPlayerViewController, PlayerTeardown {
     private func applySkipMarkers(to item: AVPlayerItem) {
         var groups: [AVNavigationMarkersGroup] = []
         if !chapterGroups.isEmpty { groups.append(AVNavigationMarkersGroup(title: "章节", timedNavigationMarkers: chapterGroups)) }
+        if !heatMarkers.isEmpty { groups.append(AVNavigationMarkersGroup(title: "高能时刻", timedNavigationMarkers: heatMarkers)) }
         func markers(_ kinds: Set<SkipRange.Kind>) -> [AVTimedMetadataGroup] {
             skips.filter { kinds.contains($0.kind) }.map { r in
                 let title = r.kind == .opening ? "片头" : r.kind == .ending ? "片尾" : "恰饭片段"
@@ -922,6 +966,7 @@ final class PlayerViewController: AVPlayerViewController, PlayerTeardown {
         loadRelatedNext()
         overlay.load(cid: request.cid, accountRules: AccountDanmakuRules.cached)
         appliedRuleCount = AccountDanmakuRules.cached.count
+        loadHeat()
         chapterGroups = []
         subtitles = []
         selectedSubtitle = nil
@@ -954,6 +999,7 @@ final class PlayerViewController: AVPlayerViewController, PlayerTeardown {
             }
             if let current = self.player?.currentItem { self.applyChapterGroups(to: current) }
             self.subtitles = API.subtitles(fromPlayerInfo: info)
+            if !self.request.isPGC, let version = API.storyGraphVersion(fromPlayerInfo: info) { self.startStory(version: version) }
             if let mask = API.danmakuMask(fromPlayerInfo: info) {
                 self.overlay.setMask(mask)
                 Log.player.info("danmaku mask available (\(mask.fps) fps)")
@@ -968,6 +1014,150 @@ final class PlayerViewController: AVPlayerViewController, PlayerTeardown {
                 self.selectSubtitle(pick)
             }
             self.updateMenus()
+        }
+    }
+
+    // MARK: 互动视频
+
+    /// Loads the story's first module the first time an interactive video plays (later modules come from choices).
+    private func startStory(version: Int) {
+        guard story?.aid != request.aid || story?.graphVersion != version else { return }
+        let (aid, bvid, cid) = (request.aid, request.bvid, request.cid)
+        storyTask?.cancel()
+        storyTask = Task { [weak self] in
+            do {
+                let start = try await API.storyEdge(aid: aid, bvid: bvid, graphVersion: version, edgeID: 0)
+                guard let self, !Task.isCancelled, self.request.aid == aid else { return }
+                self.story = StorySession(aid: aid, bvid: bvid, graphVersion: version, start: start, cid: cid)
+                Log.player.info("interactive video: graph \(version), start module \(start.edgeID) with \(start.questions.count) question(s)")
+            } catch {
+                guard !BiliClient.isCancellation(error) else { return }
+                Log.player.error("story graph failed: \(error.localizedDescription, privacy: .public)")
+                self?.overlay.showToast("互动剧情加载失败，将按普通视频播放")
+            }
+        }
+    }
+
+    private func endStory() {
+        storyTask?.cancel()
+        story = nil
+        awaitingStoryChoice = false
+    }
+
+    /// At the end of a module: the choices (or the ending), or straight on when the story decides by itself.
+    private func showStoryChoices() {
+        guard let story, !tornDown else { return }
+        var edge = story.edge
+        var choices: [StoryEdge.Choice] = []
+        var preferred: StoryEdge.Choice?
+        var timeLimit: Double?
+        if let question = edge.questions.first, !edge.isLeaf {
+            let automatic = story.state.automaticChoice(question)
+            choices = story.state.visibleChoices(question)
+            // In the corner (画中画) nobody can press a button: the story goes on by itself.
+            if question.type == 0 || choices.isEmpty || PictureInPicture.keeps(self) {
+                // No buttons (hidden jumps, conditions): Bilibili's player moves on by itself.
+                if let automatic {
+                    takeStory(.choice(automatic))
+                    return
+                }
+                // Nothing allowed: treat it as an ending rather than stopping without a word.
+                edge.isLeaf = true
+                choices = []
+            }
+            if !choices.isEmpty {
+                preferred = automatic.flatMap { choices.contains($0) ? $0 : nil } ?? choices.first
+                timeLimit = question.timeLimit
+            }
+        }
+        awaitingStoryChoice = true
+        updateContextualActions(upNext: false)
+        // Something else on screen, or in the corner: 选择剧情 (and coming back full screen) brings the chooser.
+        guard presentedViewController == nil, viewIfLoaded?.window != nil else { return }
+        present(StoryChooserController(edge: edge, choices: choices, timeLimit: timeLimit, defaultChoice: preferred,
+                                       canGoBack: !story.history.isEmpty) { [weak self] pick in self?.takeStory(pick) },
+                animated: true)
+    }
+
+    private func takeStory(_ pick: StoryPick) {
+        guard var session = story, !tornDown, !isSwitchingPage else { return }
+        awaitingStoryChoice = false
+        updateContextualActions(upNext: false)
+        switch pick {
+        case .back:
+            guard let step = session.history.popLast() else { return }
+            session.edge = step.edge
+            session.cid = step.cid
+            session.state = step.state
+            story = session
+            playStoryModule(cid: step.cid, title: step.edge.title)
+            return
+        case let .choice(choice):
+            session.history.append(.init(edge: session.edge, cid: session.cid, state: session.state))
+            session.state.choose(choice)
+            loadStoryModule(session, edgeID: choice.edgeID, cid: choice.cid)
+        case .restart:
+            let first = session.history.first ?? .init(edge: session.edge, cid: session.cid, state: session.state)
+            loadStoryModule(StorySession(aid: session.aid, bvid: session.bvid, graphVersion: session.graphVersion, start: first.edge, cid: first.cid),
+                            edgeID: 0, cid: first.cid)
+        }
+    }
+
+    /// Fetches the module a choice leads to, then plays it from the start.
+    private func loadStoryModule(_ session: StorySession, edgeID: Int, cid: Int) {
+        storyTask?.cancel()
+        storyTask = Task { [weak self] in
+            do {
+                let edge = try await API.storyEdge(aid: session.aid, bvid: session.bvid, graphVersion: session.graphVersion, edgeID: edgeID)
+                guard let self, !Task.isCancelled else { return }
+                var next = session
+                if edgeID == 0 {
+                    next = StorySession(aid: session.aid, bvid: session.bvid, graphVersion: session.graphVersion, start: edge, cid: cid)
+                } else {
+                    next.edge = edge
+                    next.cid = cid
+                    next.state.enter(edge)
+                }
+                self.story = next
+                self.playStoryModule(cid: cid, title: edge.title)
+            } catch {
+                guard !BiliClient.isCancellation(error), let self else { return }
+                Log.player.error("story module \(edgeID) failed: \(error.localizedDescription, privacy: .public)")
+                self.overlay.showToast("剧情加载失败，请重试")
+                self.awaitingStoryChoice = true
+                self.updateContextualActions(upNext: false)
+            }
+        }
+    }
+
+    private func playStoryModule(cid: Int, title: String) {
+        guard let story else { return }
+        Log.player.info("story → module \(story.edge.edgeID) (cid \(cid))")
+        reportProgress()
+        request.entries = [PlayRequest.Entry(aid: story.aid, bvid: story.bvid, cid: cid, epID: 0, title: title, isVIP: false, skips: [])]
+        request.pageIndex = 0
+        beginSwitch()
+        if !title.isEmpty { overlay.showToast(title) }
+        startLoading(.at(0))
+    }
+
+    /// 高能进度条: the curve fills in as danmaku segments arrive; the markers come once the whole video is counted.
+    private func loadHeat() {
+        heatBar.set(nil, duration: 0)
+        heatMarkers = []
+        guard AppSettings.shared.heatBar, let duration = playInfo?.duration, duration > 0 else { return }
+        let cid = request.cid
+        overlay.startHeat(duration: duration) { [weak self] curve, complete in
+            guard let self, self.request.cid == cid else { return }
+            self.heatBar.set(curve, duration: duration)
+            guard complete, let curve else { return }
+            let peaks = curve.highlights(count: 3, spacing: max(30, duration / 12), duration: duration)
+            self.heatMarkers = peaks.enumerated().map { i, t in
+                AVTimedMetadataGroup(items: [Self.metadataItem(.commonIdentifierTitle, "高能 \(i + 1) · \(String(format: "%02d:%02d", Int(t) / 60, Int(t) % 60))" as NSString)],
+                                     timeRange: CMTimeRange(start: CMTime(seconds: t, preferredTimescale: 600), duration: CMTime(seconds: 1, preferredTimescale: 600)))
+            }
+            Log.player.info("heat: \(curve.values.count) samples, highlights at \(peaks.map { Int($0) }, privacy: .public)")
+            if let item = self.player?.currentItem { self.applySkipMarkers(to: item) }
         }
     }
 
@@ -1165,5 +1355,34 @@ extension PlayerViewController: CastControllable {
         overlay.danmakuEnabled = on
         AppSettings.shared.danmakuEnabled = on
         updateMenus()
+    }
+}
+
+extension PlayerViewController: AVPlayerViewControllerDelegate {
+    /// The heat curve comes and goes with the transport bar.
+    func playerViewController(_: AVPlayerViewController, willTransitionToVisibilityOfTransportBar visible: Bool,
+                              with coordinator: AVPlayerViewControllerAnimationCoordinator)
+    {
+        coordinator.addCoordinatedAnimations({ [heatBar] in heatBar.alpha = visible ? 1 : 0 }, completion: nil)
+    }
+
+    func playerViewControllerWillStartPictureInPicture(_: AVPlayerViewController) {
+        PictureInPicture.willStart(self)
+        heatBar.alpha = 0
+    }
+
+    func playerViewControllerDidStopPictureInPicture(_: AVPlayerViewController) {
+        PictureInPicture.didStop(self)
+    }
+
+    func playerViewController(_: AVPlayerViewController, failedToStartPictureInPictureWithError error: Error) {
+        Log.player.error("picture in picture failed: \(error.localizedDescription, privacy: .public)")
+        PictureInPicture.didStop(self)
+    }
+
+    func playerViewController(_: AVPlayerViewController,
+                              restoreUserInterfaceForPictureInPictureStopWithCompletionHandler completionHandler: @escaping (Bool) -> Void)
+    {
+        PictureInPicture.restore(self, completion: completionHandler)
     }
 }

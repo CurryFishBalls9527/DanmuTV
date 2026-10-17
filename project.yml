@@ -43,10 +43,14 @@ targets:
         CFBundleShortVersionString: $(MARKETING_VERSION)
         CFBundleVersion: $(CURRENT_PROJECT_VERSION)
         DanmuTVAppGroup: group.$(APP_BUNDLE_ID)
+        # tvOS 多用户 (user-management entitlement, with the App Group): YES only with DANMUTV_MULTIUSER = YES.
+        DanmuTVRunsAsCurrentUser: $(DANMUTV_RUNS_AS_USER_$(DANMUTV_APP_GROUP)_$(DANMUTV_MULTIUSER))
         CFBundleDevelopmentRegion: zh-Hans
         UILaunchScreen: {}
         UIUserInterfaceStyle: Automatic
         UIRequiresFullScreen: true
+        # 画中画: playback continues in a corner while browsing, and over other apps.
+        UIBackgroundModes: [audio]
         CFBundleURLTypes:
           - CFBundleURLName: $(APP_BUNDLE_ID)
             CFBundleURLSchemes: [danmutv]
@@ -57,9 +61,13 @@ targets:
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: $(APP_BUNDLE_ID)
-        # App Group shared with the Top Shelf extension (继续观看); off for free teams (DANMUTV_APP_GROUP = NO).
-        DANMUTV_ENTITLEMENTS_YES: DanmuTV/DanmuTV.entitlements
-        CODE_SIGN_ENTITLEMENTS: $(DANMUTV_ENTITLEMENTS_$(DANMUTV_APP_GROUP))
+        # App Group shared with the Top Shelf extension (继续观看), off for free teams (DANMUTV_APP_GROUP = NO); with
+        # DANMUTV_MULTIUSER = YES also tvOS 多用户 (runs as the current Apple TV user, profiles in the user-independent
+        # keychain).
+        DANMUTV_ENTITLEMENTS_YES_NO: DanmuTV/DanmuTV.entitlements
+        DANMUTV_ENTITLEMENTS_YES_YES: DanmuTV/DanmuTV-MultiUser.entitlements
+        DANMUTV_RUNS_AS_USER_YES_YES: "YES"
+        CODE_SIGN_ENTITLEMENTS: $(DANMUTV_ENTITLEMENTS_$(DANMUTV_APP_GROUP)_$(DANMUTV_MULTIUSER))
         ASSETCATALOG_COMPILER_APPICON_NAME: "App Icon & Top Shelf Image"
         # 可切换的 App 图标 (Settings › 外观)
         ASSETCATALOG_COMPILER_ALTERNATE_APPICON_NAMES: "Midnight Light"
@@ -86,8 +94,9 @@ targets:
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: $(APP_BUNDLE_ID).TopShelf
-        DANMUTV_ENTITLEMENTS_YES: TopShelf/TopShelf.entitlements
-        CODE_SIGN_ENTITLEMENTS: $(DANMUTV_ENTITLEMENTS_$(DANMUTV_APP_GROUP))
+        DANMUTV_ENTITLEMENTS_YES_NO: TopShelf/TopShelf.entitlements
+        DANMUTV_ENTITLEMENTS_YES_YES: TopShelf/TopShelf-MultiUser.entitlements
+        CODE_SIGN_ENTITLEMENTS: $(DANMUTV_ENTITLEMENTS_$(DANMUTV_APP_GROUP)_$(DANMUTV_MULTIUSER))
   BiliKitTests:
     type: bundle.unit-test
     platform: tvOS

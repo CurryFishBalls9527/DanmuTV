@@ -102,6 +102,8 @@ final class AppSettings {
     var danmakuMerge: Bool { didSet { defaults.set(danmakuMerge, forKey: "danmakuMerge") } }
     /// 智能防挡: on videos with a person mask, comments pass behind people.
     var danmakuMask: Bool { didSet { defaults.set(danmakuMask, forKey: "danmakuMask") } }
+    /// 高能进度条: danmaku heat above the scrubber, and markers at the busiest moments.
+    var heatBar: Bool { didSet { defaults.set(heatBar, forKey: "heatBar") } }
     /// Also apply the account's cloud block list.
     var danmakuSyncAccountFilter: Bool { didSet { defaults.set(danmakuSyncAccountFilter, forKey: "danmakuSyncAccountFilter") } }
     /// Turn on AI-generated subtitles automatically when a video has no human ones.
@@ -165,6 +167,7 @@ final class AppSettings {
             "danmakuDensity": 1.0,
             "danmakuMerge": true,
             "danmakuMask": true,
+            "heatBar": true,
             "danmakuSyncAccountFilter": true,
             "subtitleAIDefault": false,
             "subtitleBlockWords": [String](),
@@ -214,6 +217,7 @@ final class AppSettings {
         danmakuDensity = defaults.double(forKey: "danmakuDensity")
         danmakuMerge = defaults.bool(forKey: "danmakuMerge")
         danmakuMask = defaults.bool(forKey: "danmakuMask")
+        heatBar = defaults.bool(forKey: "heatBar")
         danmakuSyncAccountFilter = defaults.bool(forKey: "danmakuSyncAccountFilter")
         subtitleAIDefault = defaults.bool(forKey: "subtitleAIDefault")
         subtitleBlockWords = defaults.stringArray(forKey: "subtitleBlockWords") ?? []

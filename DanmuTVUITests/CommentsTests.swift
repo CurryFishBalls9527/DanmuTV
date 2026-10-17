@@ -46,4 +46,21 @@ final class CommentsTests: RemoteTestCase {
         press(.select, wait: 3)
         XCTAssertTrue(app.staticTexts["扫码登录"].exists, "login opens")
     }
+
+    /// The full list opens on 按热度 with focus on the sort row; 按时间 reloads it in place.
+    func testFullListSorts() {
+        launch("danmutv://comments/170001", settle: 8)
+        // A deep link leaves focus in the tab bar; the first Down lands on the selected sort.
+        if focusedLabel != "按热度" { press(.down, wait: 1.5) }
+        XCTAssertEqual(focusedLabel, "按热度", "Down lands on the selected sort")
+        shot("comments-hot")
+        let firstHot = app.buttons.matching(NSPredicate(format: "label CONTAINS 'LV'")).firstMatch.label
+        press(.right, wait: 1)
+        press(.select, wait: 5)
+        XCTAssertEqual(focusedLabel, "按时间", "focus stays on the sort row")
+        let firstNew = app.buttons.matching(NSPredicate(format: "label CONTAINS 'LV'")).firstMatch.label
+        log("hot: \(firstHot.prefix(60)) | new: \(firstNew.prefix(60))")
+        XCTAssertNotEqual(firstHot, firstNew, "the order changed")
+        shot("comments-newest")
+    }
 }
