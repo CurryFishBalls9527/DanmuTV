@@ -327,6 +327,8 @@ final class PlayerViewController: AVPlayerViewController, PlayerTeardown {
             }
         } catch {
             guard !BiliClient.isCancellation(error), !Task.isCancelled else { return }
+            // A failed page / module switch, as opposed to a quality change or recovery of the item still playing.
+            let wasSwitching = isSwitchingPage
             isSwitchingPage = false
             if request.isChargeOnly, case BiliError.api = error {
                 showChargeNotice()
@@ -335,7 +337,7 @@ final class PlayerViewController: AVPlayerViewController, PlayerTeardown {
             } else {
                 showAlert(title: "无法播放", message: error.localizedDescription)
             }
-            if let item = player?.currentItem, let attachedRequest { rollBack(to: attachedRequest, item: item) }
+            if let item = player?.currentItem, let attachedRequest { rollBack(to: attachedRequest, item: item, wasSwitching: wasSwitching) }
         }
     }
 
@@ -614,9 +616,10 @@ final class PlayerViewController: AVPlayerViewController, PlayerTeardown {
     }
 
     /// A switch that failed: back to what the attached item plays, with what `beginSwitch` cleared for it.
-    private func rollBack(to attached: PlayRequest, item: AVPlayerItem) {
+    private func rollBack(to attached: PlayRequest, item: AVPlayerItem, wasSwitching: Bool) {
         request = attached
-        if story != nil || attachedStory != nil {
+        // Only when it was leaving a module: a failed quality change mid-module mustn't offer the choices early.
+        if wasSwitching, story != nil || attachedStory != nil {
             story = attachedStory
             // The old module has ended (that's why it switched): its choices again.
             awaitingStoryChoice = story != nil
