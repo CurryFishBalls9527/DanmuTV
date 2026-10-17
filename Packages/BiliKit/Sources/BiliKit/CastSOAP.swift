@@ -46,14 +46,17 @@ public enum SOAP {
 
     /// The phone's URI without `_nva_ext_` (it carries the account's access key), for echoing back to any sender.
     public static func redactingNvaExt(uri: String) -> String {
-        guard var components = URLComponents(string: uri), let items = components.queryItems else { return uri }
-        let kept = items.filter { !["_nva_ext_", "nva_ext"].contains($0.name) }
-        guard kept.count != items.count else { return uri }
+        // By text first, so a URI URLComponents can't parse never goes back with the key in it.
+        let scrubbed = scrubNvaExt(uri)
+        guard var components = URLComponents(string: scrubbed), let items = components.queryItems else { return verified(scrubbed) }
+        let kept = items.filter { !isNvaExtName($0.name) }
+        guard kept.count != items.count else { return verified(scrubbed) }
         components.queryItems = kept.isEmpty ? nil : kept
-        return components.string ?? ""
+        return verified(components.string ?? "")
     }
 
-    /// DIDL metadata without the `longDescription` (where newer phones put `_nva_ext_`), escaped or not.
+    /// DIDL metadata without `_nva_ext_`: the `longDescription` (where newer phones put it) is emptied, and any
+    /// `_nva_ext_=` parameter elsewhere (e.g. the URI repeated in `<res>`) is removed, escaped or not.
     public static func redactingNvaExt(metadata: String) -> String {
         func strip(_ xml: String) -> String {
             guard let regex = try? NSRegularExpression(pattern: "(<(?:[A-Za-z0-9_.-]+:)?longDescription\\b[^>]*>).*?(</(?:[A-Za-z0-9_.-]+:)?longDescription>)",
@@ -61,7 +64,26 @@ public enum SOAP {
             return regex.stringByReplacingMatches(in: xml, range: NSRange(xml.startIndex..., in: xml), withTemplate: "$1$2")
         }
         let inner = unescape(metadata)
-        return inner == metadata ? strip(metadata) : escape(strip(inner))
+        let stripped = inner == metadata ? strip(metadata) : escape(strip(inner))
+        return verified(scrubNvaExt(stripped))
+    }
+
+    /// `_nva_ext_` / `nva_ext` (also percent-encoded) as a parameter name.
+    private static let nvaExtName = "(?:_|%5F)?nva(?:_|%5F)ext(?:_|%5F)?"
+
+    private static func isNvaExtName(_ name: String) -> Bool {
+        name.range(of: "^\(nvaExtName)$", options: [.regularExpression, .caseInsensitive]) != nil
+    }
+
+    /// Empties every `_nva_ext_=` value in the text, whatever structure surrounds it.
+    private static func scrubNvaExt(_ text: String) -> String {
+        guard let regex = try? NSRegularExpression(pattern: "(\(nvaExtName))=[^&\"'<>\\s]*", options: .caseInsensitive) else { return "" }
+        return regex.stringByReplacingMatches(in: text, range: NSRange(text.startIndex..., in: text), withTemplate: "$1=")
+    }
+
+    /// Last check: if a value still follows the name somehow, echo nothing rather than risk the key.
+    private static func verified(_ text: String) -> String {
+        text.range(of: "\(nvaExtName)=[^&\"'<>\\s]", options: [.regularExpression, .caseInsensitive]) == nil ? text : ""
     }
 
     /// "01:02:03" / "1:02:03.500" → seconds.

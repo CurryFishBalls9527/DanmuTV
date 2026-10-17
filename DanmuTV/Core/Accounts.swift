@@ -30,9 +30,9 @@ final class AccountStore {
     var loginAfterProfileChoice = false
     var currentNeedsReLogin: Bool { currentID.map { expiredIDs.contains($0) } ?? false }
     private var isVerifyingAuth = false
-    /// The token refresh in flight: a refresh token works once, so a second refresh racing it would fail and look
-    /// like an expired login.
-    private var refreshing: (mid: Int, task: Task<Account?, Never>)?
+    /// Token refreshes in flight, per account: a refresh token works once, so a second refresh racing it would fail
+    /// and look like an expired login.
+    private var refreshing: [Int: Task<Account?, Never>] = [:]
 
     var current: Account? { accounts.first { $0.mid == currentID } }
     var isLoggedIn: Bool { current != nil }
@@ -221,11 +221,11 @@ final class AccountStore {
     /// Refreshes `account`'s tokens, joining a refresh of the same account already running; nil if it failed.
     @discardableResult
     private func refresh(_ account: Account) async -> Account? {
-        if let refreshing, refreshing.mid == account.mid { return await refreshing.task.value }
+        if let running = refreshing[account.mid] { return await running.value }
         let task = Task { try? await API.refresh(account) }
-        refreshing = (account.mid, task)
+        refreshing[account.mid] = task
         let updated = await task.value
-        if refreshing?.mid == account.mid { refreshing = nil }
+        refreshing[account.mid] = nil
         if let updated, accounts.contains(where: { $0.mid == updated.mid }) { update(updated) }
         return updated
     }

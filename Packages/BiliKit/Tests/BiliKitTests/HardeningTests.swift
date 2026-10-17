@@ -41,6 +41,21 @@ final class HardeningTests: XCTestCase {
         XCTAssertTrue(escaped.contains("&lt;dc:title&gt;t&lt;/dc:title&gt;"))
     }
 
+    func testNvaExtRemovedEvenWhereStructureDoesNotHelp() {
+        // URLComponents rejects this (a space and a raw "|"): the key must still not come back.
+        let broken = "http://example.com/a b|c?x=1&_nva_ext_=SECRET"
+        XCTAssertFalse(SOAP.redactingNvaExt(uri: broken).contains("SECRET"))
+        XCTAssertFalse(SOAP.redactingNvaExt(uri: "http://e.com/?nva_ext=SECRET").contains("SECRET"))
+        XCTAssertFalse(SOAP.redactingNvaExt(uri: "http://e.com/?%5Fnva%5Fext%5F=SECRET").contains("SECRET"))
+
+        // The same URI repeated in <res>, plain and entity-escaped.
+        let didl = #"<DIDL-Lite><item><res protocolInfo="http-get:*:video/mp4:*">http://e.com/a.mp4?_nva_ext_=SECRET&amp;y=2</res></item></DIDL-Lite>"#
+        let plain = SOAP.redactingNvaExt(metadata: didl)
+        XCTAssertFalse(plain.contains("SECRET"))
+        XCTAssertTrue(plain.contains("y=2"))
+        XCTAssertFalse(SOAP.redactingNvaExt(metadata: SOAP.escape(didl)).contains("SECRET"))
+    }
+
     func testMP4LargesizeOverflowDoesNotTrap() {
         var data = Data([0, 0, 0, 1]) + Data("moov".utf8)
         data += Data([0x7F, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF])

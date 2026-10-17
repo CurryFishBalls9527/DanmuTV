@@ -45,6 +45,8 @@ final class PlayerViewController: AVPlayerViewController, PlayerTeardown {
     /// What the attached item plays: a switch that fails goes back to it, so progress isn't saved under the page
     /// (or video) that never loaded.
     private var attachedRequest: PlayRequest?
+    /// The story position of the attached item (a story module that fails to load goes back to it too).
+    private var attachedStory: StorySession?
     private let overlay = PlayerOverlayView()
     /// 高能进度条 above the scrubber (shown with the transport bar), and its busiest moments as markers.
     private let heatBar = HeatBarView()
@@ -333,7 +335,7 @@ final class PlayerViewController: AVPlayerViewController, PlayerTeardown {
             } else {
                 showAlert(title: "无法播放", message: error.localizedDescription)
             }
-            if player?.currentItem != nil, let attachedRequest { request = attachedRequest }
+            if let item = player?.currentItem, let attachedRequest { rollBack(to: attachedRequest, item: item) }
         }
     }
 
@@ -400,6 +402,7 @@ final class PlayerViewController: AVPlayerViewController, PlayerTeardown {
         loader = newLoader
         isSwitchingPage = false
         attachedRequest = request
+        attachedStory = story
         if let player {
             player.replaceCurrentItem(with: item)
         } else {
@@ -607,6 +610,22 @@ final class PlayerViewController: AVPlayerViewController, PlayerTeardown {
             self.sponsorSkips = (0, [])
             self.endStory()
             self.startLoading(.resume)
+        }
+    }
+
+    /// A switch that failed: back to what the attached item plays, with what `beginSwitch` cleared for it.
+    private func rollBack(to attached: PlayRequest, item: AVPlayerItem) {
+        request = attached
+        if story != nil || attachedStory != nil {
+            story = attachedStory
+            // The old module has ended (that's why it switched): its choices again.
+            awaitingStoryChoice = story != nil
+            updateContextualActions(upNext: false)
+        }
+        if extrasCID != request.cid {
+            extrasCID = request.cid
+            loadPageExtras(item: item)
+            applySkipMarkers(to: item)
         }
     }
 
