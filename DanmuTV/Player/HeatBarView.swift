@@ -11,8 +11,11 @@ final class HeatBarView: UIView {
     override init(frame: CGRect) {
         super.init(frame: frame)
         isUserInteractionEnabled = false
+        #if DEBUG
+        // For UI tests only: VoiceOver has nothing to read here.
         isAccessibilityElement = true
         accessibilityIdentifier = "player.heat"
+        #endif
         fill.fillColor = UIColor.white.withAlphaComponent(0.22).cgColor
         line.fillColor = nil
         line.strokeColor = UIColor.white.withAlphaComponent(0.55).cgColor

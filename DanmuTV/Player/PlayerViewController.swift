@@ -169,6 +169,7 @@ final class PlayerViewController: AVPlayerViewController, PlayerTeardown {
         super.viewDidAppear(animated)
         // Back from 画中画: the TV's output mode was handed back when the player left the screen.
         if playInfo != nil { applyDisplayPlan() }
+        if awaitingStoryChoice { showStoryChoices() }
     }
 
     override func viewWillDisappear(_ animated: Bool) {
@@ -1045,7 +1046,7 @@ final class PlayerViewController: AVPlayerViewController, PlayerTeardown {
 
     /// At the end of a module: the choices (or the ending), or straight on when the story decides by itself.
     private func showStoryChoices() {
-        guard let story, !tornDown, presentedViewController == nil else { return }
+        guard let story, !tornDown else { return }
         var edge = story.edge
         var choices: [StoryEdge.Choice] = []
         var preferred: StoryEdge.Choice?
@@ -1071,6 +1072,8 @@ final class PlayerViewController: AVPlayerViewController, PlayerTeardown {
         }
         awaitingStoryChoice = true
         updateContextualActions(upNext: false)
+        // Something else on screen, or in the corner: 选择剧情 (and coming back full screen) brings the chooser.
+        guard presentedViewController == nil, viewIfLoaded?.window != nil else { return }
         present(StoryChooserController(edge: edge, choices: choices, timeLimit: timeLimit, defaultChoice: preferred,
                                        canGoBack: !story.history.isEmpty) { [weak self] pick in self?.takeStory(pick) },
                 animated: true)

@@ -74,6 +74,8 @@ final class VODDanmakuSource {
                 }
                 guard let self, self.cid == cid, !Task.isCancelled, !self.useXML else { return }
                 guard !self.timeline.loadedSegments.contains(segment) else { continue }
+                // Failed on the playback side: its own backoff (and giving up) applies.
+                if let until = self.retryAfter[segment], until > Date() { continue }
                 self.fetch(segment)
                 try? await Task.sleep(nanoseconds: 1_500_000_000)
             }
@@ -117,8 +119,10 @@ final class VODDanmakuSource {
             if attempts >= Self.maxAttempts, segment == 1, timeline.loadedSegments.isEmpty {
                 loadXML()
             } else {
-                // Back off; a segment that keeps failing simply stays empty.
+                // Back off; a segment that keeps failing simply stays empty (and counts as empty for the heat curve,
+                // so the 高能时刻 markers still come).
                 retryAfter[segment] = attempts >= Self.maxAttempts ? .distantFuture : Date().addingTimeInterval(Double(attempts * attempts) * 2)
+                if attempts >= Self.maxAttempts { countHeat(segment: segment, times: []) }
             }
         }
     }
@@ -135,8 +139,10 @@ final class VODDanmakuSource {
             guard let self, cid == self.cid else { return }
             if let (items, times) = loaded {
                 self.timeline.add(items, segment: 1)
-                // The XML list is the whole video (capped by Bilibili): count it as every segment at once.
+                // The XML list is the whole video (capped by Bilibili): it replaces whatever segments were counted,
+                // as every segment at once.
                 if let counter = self.heat {
+                    self.heat = HeatCounter(duration: counter.duration)
                     for s in 1 ... counter.segmentCount { self.countHeat(segment: s, times: s == 1 ? times : []) }
                 }
             } else {
