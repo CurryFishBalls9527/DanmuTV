@@ -39,13 +39,13 @@ final class VideoActions {
     }
 
     func toggleLike() async {
-        guard requireLogin(), var r = relation else { return }
+        guard requireLogin(), var r = await currentRelation() else { return }
         r.liked.toggle()
         await perform(r, success: r.liked ? "已点赞" : "已取消点赞") { try await API.like(aid: self.aid, r.liked) }
     }
 
     func coin(_ count: Int, alsoLike: Bool) async {
-        guard requireLogin(), var r = relation else { return }
+        guard requireLogin(), var r = await currentRelation() else { return }
         guard count <= coinsLeft else {
             message = "已投满 \(coinLimit) 枚"
             return
@@ -56,7 +56,7 @@ final class VideoActions {
     }
 
     func toggleFollow() async {
-        guard requireLogin(), var r = relation, ownerMid > 0 else { return }
+        guard requireLogin(), var r = await currentRelation(), ownerMid > 0 else { return }
         r.followingOwner.toggle()
         await perform(r, success: r.followingOwner ? "已关注" : "已取消关注") { try await API.setFollow(mid: self.ownerMid, following: r.followingOwner) }
     }
@@ -110,6 +110,12 @@ final class VideoActions {
             relation = previous
             message = error.localizedDescription
         }
+    }
+
+    /// The relation, fetched now if it wasn't (logged in from this page, or the first fetch failed).
+    private func currentRelation() async -> Relation? {
+        if relation == nil { await load() }
+        return relation
     }
 
     private func requireLogin() -> Bool {

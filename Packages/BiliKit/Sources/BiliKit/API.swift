@@ -140,7 +140,10 @@ public enum API {
             return detail
         }
         let pages = try await client.get("https://api.bilibili.com/x/player/pagelist", params)["data"]
-        var detail = VideoDetail(JSON(["bvid": params["bvid"] ?? "", "aid": params["aid"] ?? "",
+        // Opened by aid (投屏): the bvid is needed later (playurl, history), and it's derived from the aid.
+        let aid = params["aid"].flatMap(Int.init) ?? params["bvid"].flatMap(BVID.aid(from:)) ?? 0
+        let bvid = params["bvid"] ?? (aid > 0 ? BVID.bvid(from: aid) : "")
+        var detail = VideoDetail(JSON(["bvid": bvid, "aid": aid,
                                        "cid": pages[0]["cid"].intValue, "pages": pages.raw ?? []] as [String: Any]))
         detail.isPartial = true
         detail.item.duration = pages[0]["duration"].intValue

@@ -110,7 +110,8 @@ public enum MP4Init {
             } else if size == 0 {
                 size = range.upperBound - i
             }
-            guard size >= header, i + size <= range.upperBound else { break }
+            // `size <= upper - i`, not `i + size <= upper`: a bogus 64-bit largesize would overflow the sum.
+            guard size >= header, size <= range.upperBound - i else { break }
             out.append((type, i + header ..< i + size))
             i += size
         }

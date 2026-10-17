@@ -30,6 +30,9 @@ final class AccountStore {
     var loginAfterProfileChoice = false
     var currentNeedsReLogin: Bool { currentID.map { expiredIDs.contains($0) } ?? false }
     private var isVerifyingAuth = false
+    /// Token refreshes in flight, per account: a refresh token works once, so a second refresh racing it would fail
+    /// and look like an expired login.
+    private var refreshing: [Int: Task<Account?, Never>] = [:]
 
     var current: Account? { accounts.first { $0.mid == currentID } }
     var isLoggedIn: Bool { current != nil }
@@ -155,9 +158,25 @@ final class AccountStore {
     /// Turning sync off keeps local copies and leaves the iCloud copies alone, so other devices aren't logged out.
     func syncSettingChanged() {
         let synced = AppSettings.shared.iCloudSync
-        for account in accounts {
+        for var account in accounts {
+            let key = Self.itemPrefix + String(account.mid)
+            // Turning sync back on: another Apple TV may have refreshed the tokens since (the old ones no longer
+            // work there), so a newer iCloud copy wins over this device's.
+            if synced, let data = Keychain.data(for: key, scope: .synced),
+               let cloud = try? JSONDecoder().decode(Account.self, from: data), cloud.expiresAt > account.expiresAt
+            {
+                account = cloud
+                if let i = accounts.firstIndex(where: { $0.mid == cloud.mid }) { accounts[i] = cloud }
+                if cloud.mid == currentID { BiliClient.shared.setAccount(cloud) }
+            }
             persist(account)
-            if synced { Keychain.delete(Self.itemPrefix + String(account.mid), scope: .local) }
+            // Only once the iCloud copy is really there: when iCloud Keychain refuses the write, `upsert` keeps it
+            // local, and deleting the local copy would remove the only one.
+            if synced, let data = Keychain.data(for: key, scope: .synced),
+               (try? JSONDecoder().decode(Account.self, from: data)) == account
+            {
+                Keychain.delete(key, scope: .local)
+            }
         }
         reload()
     }
@@ -196,9 +215,19 @@ final class AccountStore {
         guard let account = current, !expiredIDs.contains(account.mid),
               account.expiresAt.timeIntervalSinceNow < 7 * 86400
         else { return }
-        if let updated = try? await API.refresh(account), accounts.contains(where: { $0.mid == updated.mid }) {
-            update(updated)
-        }
+        await refresh(account)
+    }
+
+    /// Refreshes `account`'s tokens, joining a refresh of the same account already running; nil if it failed.
+    @discardableResult
+    private func refresh(_ account: Account) async -> Account? {
+        if let running = refreshing[account.mid] { return await running.value }
+        let task = Task { try? await API.refresh(account) }
+        refreshing[account.mid] = task
+        let updated = await task.value
+        refreshing[account.mid] = nil
+        if let updated, accounts.contains(where: { $0.mid == updated.mid }) { update(updated) }
+        return updated
     }
 
     /// Called when an API returned -101 for a logged-in request. Confirms with /nav and tries a
@@ -208,9 +237,21 @@ final class AccountStore {
         isVerifyingAuth = true
         defer { isVerifyingAuth = false }
         guard let nav = try? await API.nav(as: account), !nav["isLogin"].bool else { return }
-        if let refreshed = try? await API.refresh(account) {
-            update(refreshed)
-            if let again = try? await API.nav(as: refreshed), again["isLogin"].bool { return }
+        // Tokens refreshed meanwhile (launch / foreground refresh): the failure was the old token's.
+        if let latest = accounts.first(where: { $0.mid == account.mid }), latest != account,
+           let again = try? await API.nav(as: latest), again["isLogin"].bool
+        {
+            return
+        }
+        let latest = accounts.first(where: { $0.mid == account.mid }) ?? account
+        if let refreshed = await refresh(latest), let again = try? await API.nav(as: refreshed), again["isLogin"].bool {
+            return
+        }
+        // Still fine with whatever is newest now (another refresh may have won).
+        if let newest = accounts.first(where: { $0.mid == account.mid }), newest != latest,
+           let again = try? await API.nav(as: newest), again["isLogin"].bool
+        {
+            return
         }
         setExpired(account.mid, true)
         // The user may have switched profiles while we were verifying.
@@ -224,6 +265,8 @@ final class AccountStore {
               // Re-read: tokens may have been refreshed while we awaited.
               var account = accounts.first(where: { $0.mid == mid })
         else { return }
+        // Logged in after all (marked expired by a race, or the token recovered): no re-login prompt.
+        if expiredIDs.contains(mid) { setExpired(mid, false) }
         account.name = info["uname"].string ?? account.name
         account.face = info["face"].string ?? account.face
         update(account)

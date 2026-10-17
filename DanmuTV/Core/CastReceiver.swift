@@ -207,8 +207,9 @@ final class CastReceiver {
         var values: [(String, String)] = []
         switch (name, action) {
         case ("AVTransport", "SetAVTransportURI"):
-            currentURI = value("CurrentURI") ?? ""
-            currentMetadata = value("CurrentURIMetaData") ?? ""
+            // Echoed to whoever asks (GetMediaInfo / GetPositionInfo need no pairing): never the access key.
+            currentURI = SOAP.redactingNvaExt(uri: value("CurrentURI") ?? "")
+            currentMetadata = SOAP.redactingNvaExt(metadata: value("CurrentURIMetaData") ?? "")
             if let content = DLNAContent.parse(setURIBody: body) {
                 Log.cast.notice("cast: SetAVTransportURI → \(String(describing: content.request?.content), privacy: .public) \(content.mediaURL?.host ?? "", privacy: .public)")
                 if let request = content.request {
@@ -222,6 +223,8 @@ final class CastReceiver {
         case ("AVTransport", "Pause"), ("NirvanaControl", "Pause"):
             player?.castPause()
         case ("AVTransport", "Stop"), ("NirvanaControl", "Stop"):
+            currentURI = ""
+            currentMetadata = ""
             if PlayerLauncher.isPlayerShowing { PlayerLauncher.dismissPlayers {} }
         case ("AVTransport", "Seek"), ("NirvanaControl", "Seek"):
             if let target = value("Target"), let seconds = SOAP.seconds(fromTime: target) { player?.castSeek(to: seconds) }

@@ -42,6 +42,11 @@ final class PlayerViewController: AVPlayerViewController, PlayerTeardown {
     private var finishedReported = false
     /// True while the next page's item is loading (the old item is still attached).
     private var isSwitchingPage = false
+    /// What the attached item plays: a switch that fails goes back to it, so progress isn't saved under the page
+    /// (or video) that never loaded.
+    private var attachedRequest: PlayRequest?
+    /// The story position of the attached item (a story module that fails to load goes back to it too).
+    private var attachedStory: StorySession?
     private let overlay = PlayerOverlayView()
     /// 高能进度条 above the scrubber (shown with the transport bar), and its busiest moments as markers.
     private let heatBar = HeatBarView()
@@ -226,6 +231,9 @@ final class PlayerViewController: AVPlayerViewController, PlayerTeardown {
 
     private func startLoading(_ start: StartPosition) {
         loadTask?.cancel()
+        // A reload (quality, codec) while the next page is loading: "where it is now" is the old page's time.
+        var start = start
+        if isSwitchingPage, case .current = start { start = .resume }
         loadTask = Task { [weak self] in await self?.load(start) }
     }
 
@@ -319,6 +327,8 @@ final class PlayerViewController: AVPlayerViewController, PlayerTeardown {
             }
         } catch {
             guard !BiliClient.isCancellation(error), !Task.isCancelled else { return }
+            // A failed page / module switch, as opposed to a quality change or recovery of the item still playing.
+            let wasSwitching = isSwitchingPage
             isSwitchingPage = false
             if request.isChargeOnly, case BiliError.api = error {
                 showChargeNotice()
@@ -327,6 +337,7 @@ final class PlayerViewController: AVPlayerViewController, PlayerTeardown {
             } else {
                 showAlert(title: "无法播放", message: error.localizedDescription)
             }
+            if let item = player?.currentItem, let attachedRequest { rollBack(to: attachedRequest, item: item, wasSwitching: wasSwitching) }
         }
     }
 
@@ -392,6 +403,8 @@ final class PlayerViewController: AVPlayerViewController, PlayerTeardown {
         teardownItem()
         loader = newLoader
         isSwitchingPage = false
+        attachedRequest = request
+        attachedStory = story
         if let player {
             player.replaceCurrentItem(with: item)
         } else {
@@ -599,6 +612,23 @@ final class PlayerViewController: AVPlayerViewController, PlayerTeardown {
             self.sponsorSkips = (0, [])
             self.endStory()
             self.startLoading(.resume)
+        }
+    }
+
+    /// A switch that failed: back to what the attached item plays, with what `beginSwitch` cleared for it.
+    private func rollBack(to attached: PlayRequest, item: AVPlayerItem, wasSwitching: Bool) {
+        request = attached
+        // Only when it was leaving a module: a failed quality change mid-module mustn't offer the choices early.
+        if wasSwitching, story != nil || attachedStory != nil {
+            story = attachedStory
+            // The old module has ended (that's why it switched): its choices again.
+            awaitingStoryChoice = story != nil
+            updateContextualActions(upNext: false)
+        }
+        if extrasCID != request.cid {
+            extrasCID = request.cid
+            loadPageExtras(item: item)
+            applySkipMarkers(to: item)
         }
     }
 
@@ -1316,7 +1346,7 @@ extension PlayerViewController: CastControllable {
     }
 
     func castSeek(to seconds: Double) {
-        guard seconds.isFinite, seconds >= 0 else { return }
+        guard seconds.isFinite, seconds >= 0, seconds < 1e9 else { return }
         guard let player, player.currentItem != nil, !isSwitchingPage else {
             // Still loading: start there instead (read when the item attaches).
             request.startAt = seconds

@@ -278,7 +278,7 @@ final class LivePlayerViewController: AVPlayerViewController, PlayerTeardown {
     }
 
     private func play() {
-        guard let stream, stream.urls.indices.contains(routeIndex), let url = URL(string: stream.urls[routeIndex]) else { return }
+        guard !tornDown, let stream, stream.urls.indices.contains(routeIndex), let url = URL(string: stream.urls[routeIndex]) else { return }
         let asset = AVURLAsset(url: url, options: ["AVURLAssetHTTPHeaderFieldsKey": ["User-Agent": BiliClient.userAgent,
                                                                                    "Referer": "https://live.bilibili.com"]])
         let item = AVPlayerItem(asset: asset)
@@ -322,7 +322,9 @@ final class LivePlayerViewController: AVPlayerViewController, PlayerTeardown {
         }
         refetchedAfterFailure = true
         Task {
-            guard let fresh = try? await API.livePlayInfo(roomID: room.roomID, quality: info.currentQuality) else {
+            let fresh = try? await API.livePlayInfo(roomID: room.roomID, quality: info.currentQuality)
+            guard !tornDown else { return }
+            guard let fresh else {
                 showFinalError(error?.localizedDescription ?? "网络错误")
                 return
             }
@@ -347,7 +349,7 @@ final class LivePlayerViewController: AVPlayerViewController, PlayerTeardown {
 
     private func reload(quality: Int) {
         Task {
-            guard let fresh = try? await API.livePlayInfo(roomID: room.roomID, quality: quality) else { return }
+            guard let fresh = try? await API.livePlayInfo(roomID: room.roomID, quality: quality), !tornDown else { return }
             info = fresh
             routeIndex = 0
             refetchedAfterFailure = false
@@ -468,7 +470,7 @@ final class VLCLivePlayerViewController: UIViewController, PlayerTeardown, VLCMe
     private var stream: LiveStream? { info.preferredStream(useVLC: true, allowHEVC: false) }
 
     private func play() {
-        guard let stream, stream.urls.indices.contains(routeIndex), let url = URL(string: stream.urls[routeIndex]) else { return }
+        guard !tornDown, let stream, stream.urls.indices.contains(routeIndex), let url = URL(string: stream.urls[routeIndex]) else { return }
         let media = VLCMedia(url: url)
         media.addOption(":http-referrer=https://live.bilibili.com")
         media.addOption(":network-caching=1500")
@@ -520,6 +522,8 @@ final class VLCLivePlayerViewController: UIViewController, PlayerTeardown, VLCMe
             } else if let count = stream?.urls.count, count > 1 {
                 routeIndex = (routeIndex + 1) % count
             }
+            // Closed while the room was re-fetched: don't start the sound again.
+            guard !tornDown else { return }
             play()
         }
     }
@@ -597,7 +601,7 @@ final class VLCLivePlayerViewController: UIViewController, PlayerTeardown, VLCMe
 
     private func changeQuality(_ qn: Int) {
         Task {
-            guard let fresh = try? await API.livePlayInfo(roomID: room.roomID, quality: qn) else { return }
+            guard let fresh = try? await API.livePlayInfo(roomID: room.roomID, quality: qn), !tornDown else { return }
             info = fresh
             routeIndex = 0
             play()

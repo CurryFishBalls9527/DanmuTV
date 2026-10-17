@@ -42,7 +42,8 @@ public struct JSON {
     public var int: Int? {
         switch raw {
         case let n as NSNumber: return n.intValue
-        case let s as String: return Int(s) ?? Double(s).map { Int($0) }
+        // `Int(Double)` traps on nan / inf / out of range ("1e300" from a cast request).
+        case let s as String: return Int(s) ?? Double(s).flatMap { Int(exactly: $0.rounded(.towardZero)) }
         default: return nil
         }
     }
