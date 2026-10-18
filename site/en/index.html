@@ -1,0 +1,240 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Danmu TV: Bilibili client for Apple TV · Free and open source</title>
+<meta name="description" content="Danmu TV is a free, open-source, unofficial Bilibili (B站) client for Apple TV: native tvOS player with 4K, HDR and Dolby Vision, smooth danmaku (bullet comments) with person masking, casting from the Bilibili phone app, anime, live streams, comments and interactive videos.">
+<link rel="canonical" href="https://curryfishballs9527.github.io/DanmuTV/en/">
+<link rel="alternate" hreflang="zh-CN" href="https://curryfishballs9527.github.io/DanmuTV/">
+<link rel="alternate" hreflang="en" href="https://curryfishballs9527.github.io/DanmuTV/en/">
+<link rel="alternate" hreflang="x-default" href="https://curryfishballs9527.github.io/DanmuTV/">
+<link rel="icon" href="../assets/icon.svg" type="image/svg+xml">
+<meta name="theme-color" content="#0b0b0f">
+<meta property="og:type" content="website">
+<meta property="og:site_name" content="Danmu TV">
+<meta property="og:locale" content="en_US">
+<meta property="og:locale:alternate" content="zh_CN">
+<meta property="og:title" content="Danmu TV: Bilibili for Apple TV">
+<meta property="og:description" content="Free, open-source, unofficial Bilibili client for Apple TV: 4K / HDR, smooth danmaku, cast from your phone.">
+<meta property="og:url" content="https://curryfishballs9527.github.io/DanmuTV/en/">
+<meta property="og:image" content="https://curryfishballs9527.github.io/DanmuTV/assets/og.jpg">
+<meta property="og:image:width" content="1280">
+<meta property="og:image:height" content="640">
+<meta name="twitter:card" content="summary_large_image">
+<link rel="stylesheet" href="../assets/site.css">
+<script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@type": "SoftwareApplication",
+  "name": "Danmu TV",
+  "alternateName": ["Danmu TV for Apple TV", "Bilibili for Apple TV"],
+  "description": "Free, open-source, unofficial Bilibili client for Apple TV: native player, 4K / HDR / Dolby Vision, danmaku, casting from the phone app.",
+  "operatingSystem": "tvOS 17+",
+  "applicationCategory": "MultimediaApplication",
+  "inLanguage": "zh-CN",
+  "license": "https://www.gnu.org/licenses/gpl-3.0.html",
+  "isAccessibleForFree": true,
+  "offers": { "@type": "Offer", "price": "0", "priceCurrency": "USD" },
+  "url": "https://curryfishballs9527.github.io/DanmuTV/en/",
+  "downloadUrl": "https://github.com/CurryFishBalls9527/DanmuTV",
+  "screenshot": "https://curryfishballs9527.github.io/DanmuTV/assets/screenshots/home.jpg",
+  "softwareHelp": "https://github.com/CurryFishBalls9527/DanmuTV/blob/main/README.en.md#building-and-installing"
+}
+</script>
+</head>
+<body>
+
+<header class="top">
+  <div class="wrap">
+    <a class="brand" href="./" aria-label="Danmu TV home">
+      <svg viewBox="0 0 32 32" aria-hidden="true"><defs><linearGradient id="g" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#ff6b4a"/><stop offset="1" stop-color="#ffb340"/></linearGradient></defs><rect width="32" height="32" rx="8" fill="url(#g)"/><path d="M7.5 9.5a2.5 2.5 0 0 1 2.5-2.5h8a2.5 2.5 0 0 1 2.5 2.5v6a2.5 2.5 0 0 1-2.5 2.5h-5l-3.5 3v-3a2 2 0 0 1-2-2z" fill="#fff"/><path d="M12.5 10v5l4-2.5z" fill="#ff7a45"/><rect x="22.5" y="9" width="4" height="1.6" rx=".8" fill="#fff" opacity=".85"/><rect x="23.3" y="12" width="3.2" height="1.6" rx=".8" fill="#fff" opacity=".7"/><rect x="22.5" y="15" width="4" height="1.6" rx=".8" fill="#fff" opacity=".85"/></svg>
+      Danmu TV
+    </a>
+    <nav>
+      <a href="#features">Features</a>
+      <a href="#screenshots">Screenshots</a>
+      <a href="#install">Install</a>
+      <a href="#faq">FAQ</a>
+      <a class="gh" href="https://github.com/CurryFishBalls9527/DanmuTV">GitHub</a>
+      <a class="lang" href="../" hreflang="zh-CN" lang="zh-CN">简体中文</a>
+    </nav>
+  </div>
+</header>
+
+<main>
+  <div class="hero">
+    <div class="wrap">
+      <span class="eyebrow">Open source · Free · Unofficial</span>
+      <h1>Bilibili on your Apple TV,<br><span class="grad">danmaku and all</span></h1>
+      <p class="lede">Danmu TV is a Bilibili client built for tvOS and the Siri Remote: the native player, 4K / HDR / Dolby
+        Vision, smooth bullet comments, and casting straight from the Bilibili phone app.</p>
+      <div class="cta">
+        <a class="btn primary" href="https://github.com/CurryFishBalls9527/DanmuTV">
+          <svg viewBox="0 0 16 16" fill="currentColor" aria-hidden="true"><path d="M8 0a8 8 0 0 0-2.53 15.59c.4.07.55-.17.55-.38v-1.33c-2.23.48-2.7-1.07-2.7-1.07-.36-.92-.89-1.17-.89-1.17-.73-.5.06-.49.06-.49.8.06 1.23.83 1.23.83.72 1.22 1.87.87 2.33.66.07-.52.28-.87.5-1.07-1.78-.2-3.65-.89-3.65-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82a7.6 7.6 0 0 1 4 0c1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.28.82 2.15 0 3.07-1.87 3.75-3.66 3.95.29.25.54.73.54 1.48v2.2c0 .21.15.46.55.38A8 8 0 0 0 8 0z"/></svg>
+          View the source
+        </a>
+        <a class="btn" href="#install">How to install</a>
+      </div>
+      <p class="facts">tvOS 17+ · GPL-3.0 · No ads, no analytics · Interface in Simplified Chinese</p>
+
+      <div class="tv" aria-hidden="true">
+        <div class="screen">
+          <img src="../assets/screenshots/home.jpg" width="1600" height="900" alt="">
+          <div class="danmaku">
+            <span style="top:4%;animation-duration:11s;animation-delay:-2s">前方高能！！！</span>
+            <span style="top:11%;animation-duration:14s;animation-delay:-8s">终于能在电视上刷弹幕了</span>
+            <span class="hot" style="top:18%;animation-duration:12s;animation-delay:-5s">4K HDR 太清楚了</span>
+            <span style="top:25%;animation-duration:13s;animation-delay:-11s">2333333</span>
+            <span style="top:32%;animation-duration:15s;animation-delay:-1s">手机点投屏就过来了 好方便</span>
+            <span style="top:39%;animation-duration:10s;animation-delay:-7s">awsl</span>
+            <span class="hot" style="top:46%;animation-duration:13s;animation-delay:-13s">弹幕从人身后穿过去了？！</span>
+          </div>
+        </div>
+        <div class="stand"></div>
+      </div>
+    </div>
+  </div>
+
+  <section id="features">
+    <div class="wrap">
+      <h2>Everything you'd expect, done natively</h2>
+      <p class="sub">Not a web wrapper: playback uses tvOS's own AVPlayer, and every screen is designed around focus and the Siri Remote.</p>
+      <div class="grid">
+        <div class="card">
+          <div class="icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="4" width="20" height="13" rx="2"/><path d="M8 21h8M12 17v4"/><path d="m10 8 5 2.5-5 2.5z" fill="currentColor"/></svg></div>
+          <h3>Native 4K / HDR playback</h3>
+          <p>4K / 8K, HEVC / AV1, HDR10 / HLG, Dolby Vision, Dolby Atmos and FLAC; dynamic range and frame-rate matching; quality follows your bandwidth.</p>
+        </div>
+        <div class="card">
+          <div class="icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M3 7h12M7 12h14M3 17h10"/></svg></div>
+          <h3>Smooth danmaku, person masking</h3>
+          <p>Off-main-thread rendering keeps dense bullet comments smooth. Tune size, speed, area, density and filters (synced with your account's block list); with Bilibili's masks, comments pass behind people.</p>
+        </div>
+        <div class="card">
+          <div class="icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="6" y="2" width="9" height="16" rx="2"/><path d="M19 8a5 5 0 0 1 0 8M17 10.5a2 2 0 0 1 0 3"/></svg></div>
+          <h3>Cast from your phone</h3>
+          <p>Tap Cast in the official Bilibili app and pick Danmu TV. The TV opens the same video in its own player, with danmaku, history and quality; pause, seek and speed follow the phone.</p>
+        </div>
+        <div class="card">
+          <div class="icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 20h18"/><path d="M3 16l4-6 4 3 4-8 6 11"/></svg></div>
+          <h3>Danmaku heat bar</h3>
+          <p>A curve of how busy the comments are, drawn above the scrubber, with the liveliest moments marked so you can jump straight to them.</p>
+        </div>
+        <div class="card">
+          <div class="icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="6" cy="6" r="2.5"/><circle cx="18" cy="6" r="2.5"/><circle cx="12" cy="19" r="2.5"/><path d="M6 8.5v1a3 3 0 0 0 3 3h6a3 3 0 0 0 3-3v-1M12 12.5v4"/></svg></div>
+          <h3>Interactive videos, picture in picture</h3>
+          <p>Choose story branches with the remote and step back when you like; shrink the video to a corner and keep browsing.</p>
+        </div>
+        <div class="card">
+          <div class="icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12a8 8 0 0 1-11.6 7.1L4 20l1-4.6A8 8 0 1 1 21 12z"/></svg></div>
+          <h3>Anime, live, comments</h3>
+          <p>Anime and series with schedules, followed shows and OP / ED skipping; live streams with danmaku and Super Chat; comment threads with images and emotes.</p>
+        </div>
+        <div class="card">
+          <div class="icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M13 2 4 14h7l-1 8 9-12h-7z"/></svg></div>
+          <h3>Made for the remote</h3>
+          <p>Hold the clickpad for a temporary 2× / 3×, autoplay of the next part and related videos, and Continue Watching on the Top Shelf.</p>
+        </div>
+        <div class="card">
+          <div class="icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3 4 6v6c0 5 3.5 8 8 9 4.5-1 8-4 8-9V6z"/><path d="m9 12 2 2 4-4"/></svg></div>
+          <h3>Accounts, and no tracking</h3>
+          <p>QR-code login, up to 5 accounts synced across Apple TVs through iCloud Keychain. No analytics, no crash reporting.</p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section id="screenshots">
+    <div class="wrap">
+      <h2>Screenshots</h2>
+      <p class="sub">Swipe sideways for more.</p>
+      <div class="shots">
+        <figure><img src="../assets/screenshots/home.jpg" width="1600" height="900" loading="lazy" alt="Danmu TV home screen with a full-screen stage and shelves"><figcaption>Home</figcaption></figure>
+        <figure><img src="../assets/screenshots/player.jpg" width="1600" height="900" loading="lazy" alt="Danmu TV player with the native transport bar and danmaku"><figcaption>Player and danmaku</figcaption></figure>
+        <figure><img src="../assets/screenshots/video.jpg" width="1600" height="900" loading="lazy" alt="Danmu TV video page with parts, like, coin and favorite"><figcaption>Video page</figcaption></figure>
+        <figure><img src="../assets/screenshots/bangumi.jpg" width="1600" height="900" loading="lazy" alt="Danmu TV anime page with popular shows and the schedule"><figcaption>Anime</figcaption></figure>
+        <figure><img src="../assets/screenshots/comments.jpg" width="1600" height="900" loading="lazy" alt="Danmu TV hot comments"><figcaption>Comments</figcaption></figure>
+        <figure><img src="../assets/screenshots/comment-thread.jpg" width="1600" height="900" loading="lazy" alt="Danmu TV comment thread"><figcaption>Comment thread</figcaption></figure>
+        <figure><img src="../assets/screenshots/ranking.jpg" width="1600" height="900" loading="lazy" alt="Danmu TV rankings"><figcaption>Rankings</figcaption></figure>
+        <figure><img src="../assets/screenshots/search.jpg" width="1600" height="900" loading="lazy" alt="Danmu TV search"><figcaption>Search</figcaption></figure>
+      </div>
+      <p class="note">Screenshots from the logged-out simulator. Videos, artwork and comments belong to their respective owners; commenters' names and avatars are blurred.</p>
+    </div>
+  </section>
+
+  <section id="install">
+    <div class="wrap">
+      <h2>How to install</h2>
+      <p class="sub">Danmu TV isn't on the App Store and no prebuilt packages exist: you build it from source with your own Mac and Apple ID, onto your own Apple TV.</p>
+      <ol class="steps">
+        <li><h3>Get ready</h3><p>A Mac with Xcode 26 or later, <code>brew install xcodegen</code>, and an Apple TV (tvOS 17+) on the same network.</p></li>
+        <li><h3>Clone and set up signing</h3><p>Copy <code>Config/Local.xcconfig.example</code> to <code>Local.xcconfig</code> and fill in your Team ID and a bundle ID of your own.</p></li>
+        <li><h3>Pair the Apple TV</h3><p>On the Apple TV open Settings › Remotes and Devices › Remote App and Devices, then pair it in Xcode's Devices window.</p></li>
+        <li><h3>Run</h3><p>Pick the DanmuTV scheme and your Apple TV and press ⌘R. A free Apple ID's signature lasts 7 days; a paid developer account's lasts a year.</p></li>
+      </ol>
+<pre><code>git clone https://github.com/CurryFishBalls9527/DanmuTV.git
+cd DanmuTV
+cp Config/Local.xcconfig.example Config/Local.xcconfig
+xcodegen generate
+open DanmuTV.xcodeproj</code></pre>
+      <p class="note">Full instructions are in the <a href="https://github.com/CurryFishBalls9527/DanmuTV/blob/main/README.en.md#building-and-installing">README</a>.</p>
+    </div>
+  </section>
+
+  <section id="faq">
+    <div class="wrap">
+      <h2>FAQ</h2>
+      <div class="faq">
+        <details>
+          <summary>Is Danmu TV made by Bilibili?</summary>
+          <p>No. It's an independent open-source project, not affiliated with, endorsed by or connected to Bilibili (Shanghai Kuanyu Digital Technology Co., Ltd.).</p>
+        </details>
+        <details>
+          <summary>Does it cost anything? Is it on the App Store?</summary>
+          <p>It's free and GPL-3.0 licensed. It has never been published on the App Store, TestFlight or anywhere else, and no packages are provided; anyone charging for it is not us.</p>
+        </details>
+        <details>
+          <summary>Can I install a build someone else made?</summary>
+          <p>Please don't. Danmu TV signs in to your Bilibili account, and a build made by someone else could be tampered with. Only install what you built yourself from this repository.</p>
+        </details>
+        <details>
+          <summary>Can I watch premium (大会员) content?</summary>
+          <p>Only with your own premium account. Danmu TV doesn't bypass any paywall, membership, region or copyright restriction, and doesn't break any DRM.</p>
+        </details>
+        <details>
+          <summary>Which Apple TVs are supported?</summary>
+          <p>Apple TV HD and Apple TV 4K on tvOS 17 or later. 4K, HDR and Dolby Vision need an Apple TV 4K and a TV that supports them.</p>
+        </details>
+        <details>
+          <summary>Is the interface in English?</summary>
+          <p>Not yet: the interface is Simplified Chinese only.</p>
+        </details>
+      </div>
+    </div>
+  </section>
+
+  <section id="disclaimer">
+    <div class="wrap">
+      <h2>Disclaimer</h2>
+      <div class="warn">
+        <p><strong>Danmu TV is an unofficial, open-source project</strong> with no connection to Bilibili. "Bilibili", "哔哩哔哩" and related names and marks belong to their owners and are used here only to describe compatibility.</p>
+        <p>All videos, anime, live streams, danmaku and comments belong to Bilibili and their creators; Danmu TV hosts, caches and distributes nothing. The APIs it uses are not official public APIs; using a third-party client may break Bilibili's terms or trigger its risk controls, at your own risk.</p>
+        <p>See the full disclaimer in the <a href="https://github.com/CurryFishBalls9527/DanmuTV/blob/main/README.en.md#disclaimer">README</a>. Rights holders can reach us at <a href="mailto:ChaosStudio599@gmail.com">ChaosStudio599@gmail.com</a>.</p>
+      </div>
+    </div>
+  </section>
+</main>
+
+<footer>
+  <div class="wrap">
+    <a href="https://github.com/CurryFishBalls9527/DanmuTV">GitHub</a>
+    <a href="https://github.com/CurryFishBalls9527/DanmuTV/releases">Releases</a>
+    <a href="https://github.com/CurryFishBalls9527/DanmuTV/issues">Report an issue</a>
+    <a href="../" hreflang="zh-CN" lang="zh-CN">简体中文</a>
+    <span class="legal">Danmu TV · GPL-3.0 · Unofficial, not affiliated with Bilibili.</span>
+  </div>
+</footer>
+
+</body>
+</html>

@@ -2,7 +2,7 @@
 
 <img src="DanmuTV/Resources/Assets.xcassets/App%20Icon%20%26%20Top%20Shelf%20Image.brandassets/Top%20Shelf%20Image%20Wide.imageset/TopShelf-wide.jpg" width="640" alt="Danmu TV">
 
-**An unofficial Bilibili client for Apple TV**
+**An unofficial Bilibili (B站 / 哔哩哔哩) client for Apple TV**
 
 Native tvOS experience · 4K / HDR / Dolby Vision · smooth danmaku · cast from your phone
 
@@ -11,7 +11,7 @@ Native tvOS experience · 4K / HDR / Dolby Vision · smooth danmaku · cast from
 ![Swift](https://img.shields.io/badge/Swift-5.9%2B-orange)
 [![CI](https://github.com/CurryFishBalls9527/DanmuTV/actions/workflows/ci.yml/badge.svg)](https://github.com/CurryFishBalls9527/DanmuTV/actions/workflows/ci.yml)
 
-[简体中文](README.md) · [Features](#features) · [Screenshots](#screenshots) · [Install](#building-and-installing) · [Disclaimer](#disclaimer)
+[Website](https://curryfishballs9527.github.io/DanmuTV/) · [简体中文](README.md) · [Features](#features) · [Screenshots](#screenshots) · [Install](#building-and-installing) · [Disclaimer](#disclaimer)
 
 </div>
 
@@ -31,7 +31,8 @@ Native tvOS experience · 4K / HDR / Dolby Vision · smooth danmaku · cast from
   all built for the Siri Remote
 - A full-screen stage on the home page, shelves, infinite scrolling; press ⏯ in a list to refresh
 - Anime: popular chart, release schedule, followed series, automatic OP / ED skipping
-- Video pages: parts, collections, related videos, **hot comments** with replies and likes
+- Video pages: parts, collections, related videos
+- **Comments**: hot / newest order, reply threads, images and emotes, likes
 - Long-press a card: watch later, not interested, go to the uploader
 - Top Shelf: popular videos and **continue watching**
 
@@ -40,6 +41,9 @@ Native tvOS experience · 4K / HDR / Dolby Vision · smooth danmaku · cast from
 - 4K / 8K, HEVC / AV1, HDR10 / HLG, Dolby Vision, Dolby Atmos / FLAC
 - Dynamic range and frame-rate matching; CDN strategies with automatic fallback
 - Resume, autoplay of the next part and of related videos
+- **Danmaku heat bar**: how busy the comments are along the timeline, drawn above the scrubber, with the peaks marked
+- **Interactive videos** (互动视频): story branches with variables and conditions, go back a step, restart
+- **Picture in picture**: keep watching in a corner while browsing the app
 - **Hold the clickpad for temporary 2× / 3×**; loop, mirror, chapters, subtitles (including AI subtitles)
 - Optional sponsor-segment skipping via [BilibiliSponsorBlock](https://github.com/hanydd/BilibiliSponsorBlock)
 

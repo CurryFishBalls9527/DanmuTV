@@ -1,0 +1,240 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Danmu TV：Apple TV 上的 B站（哔哩哔哩）客户端 · 开源免费</title>
+<meta name="description" content="Danmu TV 是开源、非官方的 Apple TV 哔哩哔哩（B站）客户端：原生 tvOS 播放器，4K / HDR / 杜比视界，流畅弹幕与智能防挡，手机 B站 App 一键投屏，番剧、直播、评论区、互动视频、画中画。从源码免费编译安装。">
+<link rel="canonical" href="https://curryfishballs9527.github.io/DanmuTV/">
+<link rel="alternate" hreflang="zh-CN" href="https://curryfishballs9527.github.io/DanmuTV/">
+<link rel="alternate" hreflang="en" href="https://curryfishballs9527.github.io/DanmuTV/en/">
+<link rel="alternate" hreflang="x-default" href="https://curryfishballs9527.github.io/DanmuTV/">
+<link rel="icon" href="assets/icon.svg" type="image/svg+xml">
+<meta name="theme-color" content="#0b0b0f">
+<meta property="og:type" content="website">
+<meta property="og:site_name" content="Danmu TV">
+<meta property="og:locale" content="zh_CN">
+<meta property="og:locale:alternate" content="en_US">
+<meta property="og:title" content="Danmu TV：Apple TV 上的 B站客户端">
+<meta property="og:description" content="开源、非官方的 Apple TV 哔哩哔哩客户端：4K / HDR、流畅弹幕、手机一键投屏。">
+<meta property="og:url" content="https://curryfishballs9527.github.io/DanmuTV/">
+<meta property="og:image" content="https://curryfishballs9527.github.io/DanmuTV/assets/og.jpg">
+<meta property="og:image:width" content="1280">
+<meta property="og:image:height" content="640">
+<meta name="twitter:card" content="summary_large_image">
+<link rel="stylesheet" href="assets/site.css">
+<script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@type": "SoftwareApplication",
+  "name": "Danmu TV",
+  "alternateName": ["Danmu TV for Apple TV", "Apple TV B站客户端"],
+  "description": "开源、非官方的 Apple TV 哔哩哔哩（B站）客户端：原生播放器、4K / HDR / 杜比视界、弹幕、手机投屏。",
+  "operatingSystem": "tvOS 17+",
+  "applicationCategory": "MultimediaApplication",
+  "inLanguage": "zh-CN",
+  "license": "https://www.gnu.org/licenses/gpl-3.0.html",
+  "isAccessibleForFree": true,
+  "offers": { "@type": "Offer", "price": "0", "priceCurrency": "USD" },
+  "url": "https://curryfishballs9527.github.io/DanmuTV/",
+  "downloadUrl": "https://github.com/CurryFishBalls9527/DanmuTV",
+  "screenshot": "https://curryfishballs9527.github.io/DanmuTV/assets/screenshots/home.jpg",
+  "softwareHelp": "https://github.com/CurryFishBalls9527/DanmuTV#从源码安装"
+}
+</script>
+</head>
+<body>
+
+<header class="top">
+  <div class="wrap">
+    <a class="brand" href="./" aria-label="Danmu TV 首页">
+      <svg viewBox="0 0 32 32" aria-hidden="true"><defs><linearGradient id="g" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#ff6b4a"/><stop offset="1" stop-color="#ffb340"/></linearGradient></defs><rect width="32" height="32" rx="8" fill="url(#g)"/><path d="M7.5 9.5a2.5 2.5 0 0 1 2.5-2.5h8a2.5 2.5 0 0 1 2.5 2.5v6a2.5 2.5 0 0 1-2.5 2.5h-5l-3.5 3v-3a2 2 0 0 1-2-2z" fill="#fff"/><path d="M12.5 10v5l4-2.5z" fill="#ff7a45"/><rect x="22.5" y="9" width="4" height="1.6" rx=".8" fill="#fff" opacity=".85"/><rect x="23.3" y="12" width="3.2" height="1.6" rx=".8" fill="#fff" opacity=".7"/><rect x="22.5" y="15" width="4" height="1.6" rx=".8" fill="#fff" opacity=".85"/></svg>
+      Danmu TV
+    </a>
+    <nav>
+      <a href="#features">功能</a>
+      <a href="#screenshots">截图</a>
+      <a href="#install">安装</a>
+      <a href="#faq">常见问题</a>
+      <a class="gh" href="https://github.com/CurryFishBalls9527/DanmuTV">GitHub</a>
+      <a class="lang" href="en/" hreflang="en" lang="en">English</a>
+    </nav>
+  </div>
+</header>
+
+<main>
+  <div class="hero">
+    <div class="wrap">
+      <span class="eyebrow">开源 · 免费 · 非官方</span>
+      <h1>在 Apple TV 上<br><span class="grad">刷 B站、看弹幕</span></h1>
+      <p class="lede">Danmu TV 是为遥控器打造的哔哩哔哩 tvOS 客户端：原生播放器，4K / HDR / 杜比视界，流畅的弹幕，
+        在手机 B站 App 里点「投屏」就能在电视上接着看。</p>
+      <div class="cta">
+        <a class="btn primary" href="https://github.com/CurryFishBalls9527/DanmuTV">
+          <svg viewBox="0 0 16 16" fill="currentColor" aria-hidden="true"><path d="M8 0a8 8 0 0 0-2.53 15.59c.4.07.55-.17.55-.38v-1.33c-2.23.48-2.7-1.07-2.7-1.07-.36-.92-.89-1.17-.89-1.17-.73-.5.06-.49.06-.49.8.06 1.23.83 1.23.83.72 1.22 1.87.87 2.33.66.07-.52.28-.87.5-1.07-1.78-.2-3.65-.89-3.65-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82a7.6 7.6 0 0 1 4 0c1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.28.82 2.15 0 3.07-1.87 3.75-3.66 3.95.29.25.54.73.54 1.48v2.2c0 .21.15.46.55.38A8 8 0 0 0 8 0z"/></svg>
+          查看源码
+        </a>
+        <a class="btn" href="#install">怎么安装</a>
+      </div>
+      <p class="facts">tvOS 17+ · GPL-3.0 · 无广告、无统计</p>
+
+      <div class="tv" aria-hidden="true">
+        <div class="screen">
+          <img src="assets/screenshots/home.jpg" width="1600" height="900" alt="">
+          <div class="danmaku">
+            <span style="top:4%;animation-duration:11s;animation-delay:-2s">前方高能！！！</span>
+            <span style="top:11%;animation-duration:14s;animation-delay:-8s">终于能在电视上刷弹幕了</span>
+            <span class="hot" style="top:18%;animation-duration:12s;animation-delay:-5s">4K HDR 太清楚了</span>
+            <span style="top:25%;animation-duration:13s;animation-delay:-11s">2333333</span>
+            <span style="top:32%;animation-duration:15s;animation-delay:-1s">手机点投屏就过来了 好方便</span>
+            <span style="top:39%;animation-duration:10s;animation-delay:-7s">awsl</span>
+            <span class="hot" style="top:46%;animation-duration:13s;animation-delay:-13s">弹幕从人身后穿过去了？！</span>
+          </div>
+        </div>
+        <div class="stand"></div>
+      </div>
+    </div>
+  </div>
+
+  <section id="features">
+    <div class="wrap">
+      <h2>该有的都有，而且是原生的</h2>
+      <p class="sub">不是网页套壳：播放用 tvOS 原生的 AVPlayer，界面为 Siri Remote 的焦点操作设计。</p>
+      <div class="grid">
+        <div class="card">
+          <div class="icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="4" width="20" height="13" rx="2"/><path d="M8 21h8M12 17v4"/><path d="m10 8 5 2.5-5 2.5z" fill="currentColor"/></svg></div>
+          <h3>原生 4K / HDR 播放</h3>
+          <p>4K / 8K、HEVC / AV1、HDR10 / HLG、杜比视界、杜比全景声与 FLAC；自动匹配动态范围与帧率，按带宽切换清晰度。</p>
+        </div>
+        <div class="card">
+          <div class="icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M3 7h12M7 12h14M3 17h10"/></svg></div>
+          <h3>流畅弹幕 · 智能防挡</h3>
+          <p>后台光栅化渲染，高密度弹幕也不卡；字号、速度、区域、密度、屏蔽词可调，同步账号屏蔽词；用 B站的人像蒙版让弹幕从人物身后穿过。</p>
+        </div>
+        <div class="card">
+          <div class="icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="6" y="2" width="9" height="16" rx="2"/><path d="M19 8a5 5 0 0 1 0 8M17 10.5a2 2 0 0 1 0 3"/></svg></div>
+          <h3>手机一键投屏</h3>
+          <p>在官方 B站手机 App 里点「投屏」、选 Danmu TV：电视用自己的播放器打开同一个视频，弹幕、历史、清晰度都在；暂停、进度、倍速跟着手机走。</p>
+        </div>
+        <div class="card">
+          <div class="icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 20h18"/><path d="M3 16l4-6 4 3 4-8 6 11"/></svg></div>
+          <h3>高能进度条</h3>
+          <p>弹幕热度曲线画在进度条上方，最热闹的高能时刻会标在进度条上，可以直接跳过去。</p>
+        </div>
+        <div class="card">
+          <div class="icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="6" cy="6" r="2.5"/><circle cx="18" cy="6" r="2.5"/><circle cx="12" cy="19" r="2.5"/><path d="M6 8.5v1a3 3 0 0 0 3 3h6a3 3 0 0 0 3-3v-1M12 12.5v4"/></svg></div>
+          <h3>互动视频 · 画中画</h3>
+          <p>互动视频的剧情分支用遥控器选，支持返回上一步；画中画把视频缩到角落，一边看一边逛。</p>
+        </div>
+        <div class="card">
+          <div class="icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12a8 8 0 0 1-11.6 7.1L4 20l1-4.6A8 8 0 1 1 21 12z"/></svg></div>
+          <h3>番剧 · 直播 · 评论区</h3>
+          <p>番剧与影视（时间表、追番、跳过片头片尾），直播弹幕与醒目留言，评论区的楼中楼、图片和表情。</p>
+        </div>
+        <div class="card">
+          <div class="icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M13 2 4 14h7l-1 8 9-12h-7z"/></svg></div>
+          <h3>为遥控器设计</h3>
+          <p>长按确认键临时 2× / 3× 倍速，连续播放和相关推荐自动播放，Top Shelf 显示继续观看。</p>
+        </div>
+        <div class="card">
+          <div class="icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3 4 6v6c0 5 3.5 8 8 9 4.5-1 8-4 8-9V6z"/><path d="m9 12 2 2 4-4"/></svg></div>
+          <h3>多账户 · 不收集数据</h3>
+          <p>扫码登录，最多 5 个账户，通过 iCloud 钥匙串在多台 Apple TV 间同步；没有任何统计或崩溃上报。</p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section id="screenshots">
+    <div class="wrap">
+      <h2>截图</h2>
+      <p class="sub">左右滑动查看更多。</p>
+      <div class="shots">
+        <figure><img src="assets/screenshots/home.jpg" width="1600" height="900" loading="lazy" alt="Danmu TV 首页：推荐视频大图舞台与横向分区"><figcaption>首页</figcaption></figure>
+        <figure><img src="assets/screenshots/player.jpg" width="1600" height="900" loading="lazy" alt="Danmu TV 播放器：原生进度条与弹幕"><figcaption>播放器与弹幕</figcaption></figure>
+        <figure><img src="assets/screenshots/video.jpg" width="1600" height="900" loading="lazy" alt="Danmu TV 视频详情页：分 P、点赞投币收藏"><figcaption>视频详情</figcaption></figure>
+        <figure><img src="assets/screenshots/bangumi.jpg" width="1600" height="900" loading="lazy" alt="Danmu TV 番剧页：热门番剧与时间表"><figcaption>番剧</figcaption></figure>
+        <figure><img src="assets/screenshots/comments.jpg" width="1600" height="900" loading="lazy" alt="Danmu TV 评论区：热门评论"><figcaption>评论区</figcaption></figure>
+        <figure><img src="assets/screenshots/comment-thread.jpg" width="1600" height="900" loading="lazy" alt="Danmu TV 评论回复（楼中楼）"><figcaption>楼中楼</figcaption></figure>
+        <figure><img src="assets/screenshots/ranking.jpg" width="1600" height="900" loading="lazy" alt="Danmu TV 排行榜"><figcaption>排行榜</figcaption></figure>
+        <figure><img src="assets/screenshots/search.jpg" width="1600" height="900" loading="lazy" alt="Danmu TV 搜索"><figcaption>搜索</figcaption></figure>
+      </div>
+      <p class="note">截图来自未登录的模拟器；视频、封面与评论内容版权归各自所有者，评论用户信息已模糊处理。</p>
+    </div>
+  </section>
+
+  <section id="install">
+    <div class="wrap">
+      <h2>怎么安装</h2>
+      <p class="sub">Danmu TV 不在 App Store 上架，也不提供安装包：用你自己的 Mac 和 Apple ID 从源码编译，装到自己的 Apple TV 上。</p>
+      <ol class="steps">
+        <li><h3>准备</h3><p>一台装了 Xcode 26 或更新版本的 Mac，<code>brew install xcodegen</code>，以及和 Mac 在同一网络的 Apple TV（tvOS 17+）。</p></li>
+        <li><h3>下载源码并填写签名</h3><p>复制 <code>Config/Local.xcconfig.example</code> 为 <code>Local.xcconfig</code>，填入你的 Team ID 和一个属于你的 Bundle ID。</p></li>
+        <li><h3>配对 Apple TV</h3><p>在 Apple TV 的「设置 › 遥控器与设备 › 遥控器 App 与设备」里，和 Xcode 的 Devices 窗口配对。</p></li>
+        <li><h3>运行</h3><p>选择 DanmuTV scheme 和你的 Apple TV，按 ⌘R。免费 Apple ID 签名 7 天后需要重新安装，付费开发者账号一年有效。</p></li>
+      </ol>
+<pre><code>git clone https://github.com/CurryFishBalls9527/DanmuTV.git
+cd DanmuTV
+cp Config/Local.xcconfig.example Config/Local.xcconfig
+xcodegen generate
+open DanmuTV.xcodeproj</code></pre>
+      <p class="note">完整说明见 <a href="https://github.com/CurryFishBalls9527/DanmuTV#从源码安装">README</a>。</p>
+    </div>
+  </section>
+
+  <section id="faq">
+    <div class="wrap">
+      <h2>常见问题</h2>
+      <div class="faq">
+        <details>
+          <summary>Danmu TV 是 B站官方的吗？</summary>
+          <p>不是。Danmu TV 是独立的开源项目，与哔哩哔哩（上海宽娱数码科技有限公司）没有任何关联，也未获其授权或认可。</p>
+        </details>
+        <details>
+          <summary>要钱吗？能在 App Store 下载吗？</summary>
+          <p>完全免费，GPL-3.0 开源。它从未在 App Store、TestFlight 或任何平台上架，也不提供安装包；任何收费提供本项目的行为都与作者无关。</p>
+        </details>
+        <details>
+          <summary>可以直接装别人打包好的版本吗？</summary>
+          <p>不建议。Danmu TV 需要登录你的 B站账号，他人打包的版本可能被篡改，有盗号风险。请只从本仓库源码自己编译。</p>
+        </details>
+        <details>
+          <summary>能看大会员内容吗？</summary>
+          <p>需要你自己的大会员账号。Danmu TV 不绕过任何付费、会员、地区或版权限制，也不破解 DRM。</p>
+        </details>
+        <details>
+          <summary>支持哪些 Apple TV？</summary>
+          <p>tvOS 17 及以上的 Apple TV HD 和 Apple TV 4K。4K、HDR 和杜比视界需要 Apple TV 4K 和支持的电视。</p>
+        </details>
+        <details>
+          <summary>界面有英文吗？</summary>
+          <p>目前只有简体中文界面。</p>
+        </details>
+      </div>
+    </div>
+  </section>
+
+  <section id="disclaimer">
+    <div class="wrap">
+      <h2>免责声明</h2>
+      <div class="warn">
+        <p><strong>Danmu TV 是非官方的开源项目</strong>，与哔哩哔哩没有任何关联。「哔哩哔哩」「bilibili」等名称和标识是其各自所有者的商标，此处仅用于说明兼容性。</p>
+        <p>所有视频、番剧、直播、弹幕、评论的版权归哔哩哔哩及各内容创作者所有；Danmu TV 不托管、不缓存、不分发任何内容。所用接口并非官方公开接口，使用第三方客户端可能违反哔哩哔哩用户协议或触发风控，风险由使用者自行承担。</p>
+        <p>完整声明见 <a href="https://github.com/CurryFishBalls9527/DanmuTV#免责声明">README</a>。权利人如有异议，请发邮件至 <a href="mailto:ChaosStudio599@gmail.com">ChaosStudio599@gmail.com</a>。</p>
+      </div>
+    </div>
+  </section>
+</main>
+
+<footer>
+  <div class="wrap">
+    <a href="https://github.com/CurryFishBalls9527/DanmuTV">GitHub</a>
+    <a href="https://github.com/CurryFishBalls9527/DanmuTV/releases">版本记录</a>
+    <a href="https://github.com/CurryFishBalls9527/DanmuTV/issues">反馈问题</a>
+    <a href="en/" hreflang="en" lang="en">English</a>
+    <span class="legal">Danmu TV · GPL-3.0 · 非官方项目，与哔哩哔哩无关。</span>
+  </div>
+</footer>
+
+</body>
+</html>

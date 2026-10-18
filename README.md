@@ -2,7 +2,7 @@
 
 <img src="DanmuTV/Resources/Assets.xcassets/App%20Icon%20%26%20Top%20Shelf%20Image.brandassets/Top%20Shelf%20Image%20Wide.imageset/TopShelf-wide.jpg" width="640" alt="Danmu TV">
 
-**非官方的 Apple TV 哔哩哔哩客户端**
+**非官方的 Apple TV 哔哩哔哩（B站）客户端**
 
 原生 tvOS 体验 · 4K / HDR / 杜比视界 · 流畅弹幕 · 手机投屏
 
@@ -11,7 +11,7 @@
 ![Swift](https://img.shields.io/badge/Swift-5.9%2B-orange)
 [![CI](https://github.com/CurryFishBalls9527/DanmuTV/actions/workflows/ci.yml/badge.svg)](https://github.com/CurryFishBalls9527/DanmuTV/actions/workflows/ci.yml)
 
-[English](README.en.md) · [功能](#功能) · [截图](#截图) · [安装](#从源码安装) · [免责声明](#免责声明)
+[官网](https://curryfishballs9527.github.io/DanmuTV/) · [English](README.en.md) · [功能](#功能) · [截图](#截图) · [安装](#从源码安装) · [免责声明](#免责声明)
 
 </div>
 
@@ -28,7 +28,8 @@
 - **推荐 / 热门 / 排行榜 / 动态 / 直播 / 番剧 / 搜索 / 我的**，为遥控器设计的焦点体验
 - 首页大图舞台、横向分区、无限滚动；列表内按 ⏯ 刷新
 - 番剧 / 影视：热门榜、时间表、我的追番、OP / ED 自动跳过
-- 视频详情：分 P、合集、相关推荐、**热门评论**（含回复与点赞）
+- 视频详情：分 P、合集、相关推荐
+- **评论区**：热门 / 最新排序、楼中楼回复、图片与表情、点赞
 - 卡片长按菜单：稍后再看、不感兴趣、去 UP 主页
 - Top Shelf：热门与**继续观看**
 
@@ -37,6 +38,9 @@
 - 4K / 8K、HEVC / AV1、HDR10 / HLG、杜比视界、杜比全景声 / FLAC
 - 自动匹配动态范围与帧率；CDN 策略与自动切换线路
 - 继续播放、连续播放、播完自动播放相关推荐
+- **高能进度条**：弹幕热度曲线显示在进度条上方，并标出最热闹的高能时刻
+- **互动视频**：剧情分支选择（含变量与条件）、返回上一步、从头开始
+- **画中画**：视频缩到角落继续播放，同时浏览其他内容
 - **长按确认键临时 2× / 3× 倍速**，单集循环、镜像、章节、字幕（含 AI 字幕）
 - 社区片段数据库跳过恰饭片段（[BilibiliSponsorBlock](https://github.com/hanydd/BilibiliSponsorBlock)，默认关闭）
 
