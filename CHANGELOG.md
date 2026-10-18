@@ -5,6 +5,15 @@ All notable changes to this project are documented here. The format follows
 
 ## [Unreleased]
 
+### Fixed
+- Player: when the next part, related video or story module fails to load, the video that was playing keeps its
+  chapters, 高能时刻, subtitles, danmaku and story choices (also ones still loading when the switch began), keeps the
+  formats it had already fallen back from (SDR / AVC / AAC), and progress is never saved under the item that didn't
+  load. A related video that can't be played no longer ends related autoplay: the next one plays instead. A new part
+  no longer shows the previous part's chapters until its own arrive.
+- Player: an error that can't be shown as an alert (something else still on screen, e.g. the story chooser leaving)
+  appears as a notice instead of not at all.
+
 ## [0.1.0] - 2026-10-11
 
 First public release.
