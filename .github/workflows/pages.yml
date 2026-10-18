@@ -1,0 +1,52 @@
+name: Website
+
+# The project page at https://curryfishballs9527.github.io/DanmuTV/ (site/ plus the README screenshots).
+on:
+  push:
+    branches: [main]
+    paths: [site/**, docs/screenshots/**, .github/workflows/pages.yml]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: pages
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    name: Build and deploy
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pages: write
+      id-token: write
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - uses: actions/checkout@v5
+      - name: Assemble the site
+        run: |
+          mkdir -p _site
+          cp -R site/. _site/
+          mkdir -p _site/assets/screenshots
+          cp docs/screenshots/*.jpg _site/assets/screenshots/
+          sed -i "s/__LASTMOD__/$(git log -1 --format=%cs -- site docs/screenshots)/g" _site/sitemap.xml
+      - uses: actions/configure-pages@v5
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: _site
+      - id: deployment
+        uses: actions/deploy-pages@v4
+      # IndexNow: tells Bing (and other participating engines) the pages changed. Google doesn't take part; it
+      # reads the sitemap submitted in Search Console.
+      - name: Notify search engines
+        continue-on-error: true
+        run: |
+          key=$(basename site/*.txt .txt)
+          base=https://curryfishballs9527.github.io/DanmuTV
+          curl -sS -o /dev/null -w "IndexNow: HTTP %{http_code}\n" -X POST https://api.indexnow.org/indexnow \
+            -H "Content-Type: application/json; charset=utf-8" \
+            -d "{\"host\":\"curryfishballs9527.github.io\",\"key\":\"$key\",\"keyLocation\":\"$base/$key.txt\",\"urlList\":[\"$base/\",\"$base/en/\"]}"
