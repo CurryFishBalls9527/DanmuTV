@@ -5,6 +5,12 @@ All notable changes to this project are documented here. The format follows
 
 ## [Unreleased]
 
+### Fixed
+- Player: when the next part, related video or story module fails to load, the video that was playing keeps its
+  chapters, 高能时刻, danmaku and story choices, and progress is never saved under the item that didn't load. A related
+  video that can't be played no longer ends related autoplay. A new part no longer shows the previous part's chapters
+  until its own arrive.
+
 ## [0.1.0] - 2026-10-11
 
 First public release.
