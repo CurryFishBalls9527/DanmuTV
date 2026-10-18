@@ -28,18 +28,17 @@ final class PlayerViewController: AVPlayerViewController, PlayerTeardown {
     private var playInfo: PlayInfo?
     /// nil = adaptive (自动).
     private var manualQuality: Int?
-    /// Set after a decode failure on HEVC/AV1: retry this page with AVC.
-    private var forceAVC = false
-    /// Set after an HDR/DV variant failed: retry this page in SDR (HDR 播放失败时自动降级).
-    private var hdrFailed = false
-    /// Set after Dolby/FLAC audio failed: retry with AAC.
-    private var audioFailed = false
+    /// What failed on this page and is avoided when it reloads (see `PlaybackFallbacks`); kept with the page, so a
+    /// switch that fails goes back to them too.
+    private var fallbacks: PlaybackFallbacks {
+        get { phase.target.fallbacks }
+        set { phase.target.fallbacks = newValue }
+    }
     private var showsDebug = false
     private var debugTimer: Timer?
     private var errorLogObserver: NSObjectProtocol?
     /// The display manager the criteria were set on, so they can be cleared even after the window is gone.
     private weak var displayManager: AVDisplayManager?
-    private var recoveryAttempts = 0
     private var timeObserver: Any?
     private var itemObservations: [NSKeyValueObservation] = []
     private var endObserver: NSObjectProtocol?
@@ -390,13 +389,13 @@ final class PlayerViewController: AVPlayerViewController, PlayerTeardown {
 
     /// HDR only when the device/display path can show it and SDR isn't forced.
     private var hdrAllowed: Bool {
-        !hdrFailed && !AppSettings.shared.forceSDR && AVPlayer.eligibleForHDRPlayback
+        !fallbacks.hdrFailed && !AppSettings.shared.forceSDR && AVPlayer.eligibleForHDRPlayback
     }
 
     private func preferences() -> StreamPreferences {
         let settings = AppSettings.shared
         var supported: Set<Int> = [CodecPreference.avc.codecID]
-        if !forceAVC {
+        if !fallbacks.forceAVC {
             if VTIsHardwareDecodeSupported(kCMVideoCodecType_HEVC) { supported.insert(CodecPreference.hevc.codecID) }
             if VTIsHardwareDecodeSupported(kCMVideoCodecType_AV1) { supported.insert(CodecPreference.av1.codecID) }
         }
@@ -407,8 +406,8 @@ final class PlayerViewController: AVPlayerViewController, PlayerTeardown {
                                  filterHighFramerate: settings.filterHighFramerate,
                                  allowHDR: hdrAllowed && settings.enableHDR,
                                  allowDolbyVision: hdrAllowed && settings.enableDolbyVision && AVPlayer.availableHDRModes.contains(.dolbyVision),
-                                 preferDolbyAudio: settings.enableDolbyAudio && !audioFailed,
-                                 preferLosslessAudio: settings.enableLosslessAudio && !audioFailed,
+                                 preferDolbyAudio: settings.enableDolbyAudio && !fallbacks.audioFailed,
+                                 preferLosslessAudio: settings.enableLosslessAudio && !fallbacks.audioFailed,
                                  manualQuality: manualQuality)
     }
 
@@ -629,7 +628,8 @@ final class PlayerViewController: AVPlayerViewController, PlayerTeardown {
                 // Another related video may follow instead (never this one again).
                 self.playedVideos.insert(item.bvid)
                 self.rollBackSwitch()
-                self.loadRelatedNext()
+                // Already ended (autoplay): nothing would start the next one, so it plays as soon as it's found.
+                self.loadRelatedNext(playWhenFound: self.attachedItemEnded)
                 // Chosen from 即将播放 before the end: carry on with this one (no-op once it has ended).
                 self.player?.play()
                 return
@@ -639,6 +639,12 @@ final class PlayerViewController: AVPlayerViewController, PlayerTeardown {
             self.sponsorSkips = (0, [])
             self.startLoading(.resume)
         }
+    }
+
+    /// The attached item played to its end (what `didFinishPage` acts on).
+    private var attachedItemEnded: Bool {
+        guard let item = player?.currentItem, item.duration.isNumeric else { return false }
+        return item.currentTime().seconds >= item.duration.seconds - 0.5
     }
 
     /// A switch that didn't happen: back to what the attached item plays (its extras were never cleared).
@@ -658,10 +664,10 @@ final class PlayerViewController: AVPlayerViewController, PlayerTeardown {
         overlay.setBoost(nil)
         lastReportedSecond = -1
         finishedReported = false
-        recoveryAttempts = 0
-        forceAVC = false
-        hdrFailed = false
-        audioFailed = false
+        var next = next
+        // Another page or video starts with nothing ruled out; the same one (a related video still being looked
+        // up) keeps what already failed.
+        if next.request.cid != phase.attached?.request.cid { next.fallbacks = PlaybackFallbacks() }
         phase.beginSwitch(to: next)
         updateContextualActions(upNext: false)
         player?.pause()
@@ -979,7 +985,7 @@ final class PlayerViewController: AVPlayerViewController, PlayerTeardown {
     }
 
     /// The related video to autoplay after the last part of a UGC video.
-    private func loadRelatedNext() {
+    private func loadRelatedNext(playWhenFound: Bool = false) {
         relatedNext = nil
         relatedTask?.cancel()
         let bvid = request.bvid
@@ -988,6 +994,9 @@ final class PlayerViewController: AVPlayerViewController, PlayerTeardown {
         relatedTask = Task { [weak self] in
             guard let related = try? await API.related(bvid: bvid), let self, !Task.isCancelled, self.request.bvid == bvid else { return }
             self.relatedNext = AutoPlay.next(after: bvid, related: related, played: self.playedVideos)
+            if playWhenFound, let next = self.relatedNext, self.attachedItemEnded, !self.isSwitchingPage {
+                self.playRelated(next)
+            }
         }
     }
 
@@ -1023,7 +1032,7 @@ final class PlayerViewController: AVPlayerViewController, PlayerTeardown {
             let multiPart = request.entries.count > 1
             Task { [weak self] in
                 guard let segments = try? await API.sponsorSegments(bvid: bvid, cid: cid, multiPart: multiPart), !segments.isEmpty,
-                      let self, self.request.cid == cid else { return }
+                      let self, self.extrasCID == cid else { return }
                 self.sponsorSkips = (cid, segments)
                 self.skips += segments
                 if let current = self.player?.currentItem { self.applySkipMarkers(to: current) }
@@ -1032,11 +1041,11 @@ final class PlayerViewController: AVPlayerViewController, PlayerTeardown {
         }
         subtitleTask = Task { [weak self] in
             await AccountDanmakuRules.refreshIfNeeded()
-            if let self, self.request.cid == cid, AccountDanmakuRules.cached.count != self.appliedRuleCount {
+            if let self, self.extrasCID == cid, AccountDanmakuRules.cached.count != self.appliedRuleCount {
                 self.appliedRuleCount = AccountDanmakuRules.cached.count
                 self.overlay.applyAccountRules(AccountDanmakuRules.cached)
             }
-            guard let info = try? await API.playerInfo(bvid: bvid, cid: cid), !Task.isCancelled, let self, self.request.cid == cid else { return }
+            guard let info = try? await API.playerInfo(bvid: bvid, cid: cid), !Task.isCancelled, let self, self.extrasCID == cid else { return }
             let chapters = API.chapters(fromPlayerInfo: info)
             self.chapterGroups = chapters.map { chapter in
                 AVTimedMetadataGroup(items: [Self.metadataItem(.commonIdentifierTitle, chapter.title as NSString)],
@@ -1045,7 +1054,10 @@ final class PlayerViewController: AVPlayerViewController, PlayerTeardown {
             }
             if let current = self.player?.currentItem { self.applyChapterGroups(to: current) }
             self.subtitles = API.subtitles(fromPlayerInfo: info)
-            if !self.request.isPGC, let version = API.storyGraphVersion(fromPlayerInfo: info) { self.startStory(version: version) }
+            // The story is the target's: not while another page is loading (this page then plays as an ordinary video).
+            if !self.request.isPGC, !self.isSwitchingPage, let version = API.storyGraphVersion(fromPlayerInfo: info) {
+                self.startStory(version: version)
+            }
             if let mask = API.danmakuMask(fromPlayerInfo: info) {
                 self.overlay.setMask(mask)
                 Log.player.info("danmaku mask available (\(mask.fps) fps)")
@@ -1073,7 +1085,7 @@ final class PlayerViewController: AVPlayerViewController, PlayerTeardown {
         storyTask = Task { [weak self] in
             do {
                 let start = try await API.storyEdge(aid: aid, bvid: bvid, graphVersion: version, edgeID: 0)
-                guard let self, !Task.isCancelled, self.request.aid == aid else { return }
+                guard let self, !Task.isCancelled, !self.isSwitchingPage, self.request.aid == aid else { return }
                 self.story = StorySession(aid: aid, bvid: bvid, graphVersion: version, start: start, cid: cid)
                 Log.player.info("interactive video: graph \(version), start module \(start.edgeID) with \(start.questions.count) question(s)")
             } catch {
@@ -1193,7 +1205,7 @@ final class PlayerViewController: AVPlayerViewController, PlayerTeardown {
         guard AppSettings.shared.heatBar, let duration = playInfo?.duration, duration > 0 else { return }
         let cid = request.cid
         overlay.startHeat(duration: duration) { [weak self] curve, complete in
-            guard let self, self.request.cid == cid else { return }
+            guard let self, self.extrasCID == cid else { return }
             self.heatBar.set(curve, duration: duration)
             guard complete, let curve else { return }
             let peaks = curve.highlights(count: 3, spacing: max(30, duration / 12), duration: duration)
@@ -1211,9 +1223,9 @@ final class PlayerViewController: AVPlayerViewController, PlayerTeardown {
         overlay.setSubtitles([])
         updateMenus()
         guard let subtitle else { return }
-        let cid = request.cid
+        let cid = extrasCID
         Task { [weak self] in
-            guard let lines = try? await API.subtitleLines(subtitle), let self, self.request.cid == cid,
+            guard let lines = try? await API.subtitleLines(subtitle), let self, self.extrasCID == cid,
                   self.selectedSubtitle == subtitle
             else { return }
             self.overlay.setSubtitles(lines)
@@ -1253,8 +1265,8 @@ final class PlayerViewController: AVPlayerViewController, PlayerTeardown {
         let httpStatus = event?.errorStatusCode ?? 0
         // Signed CDN URLs expire (~2h) and mirrors die: fetch fresh URLs once and continue in place.
         // A non-HTTP failure on HEVC/AV1 is treated as a decode problem: retry with AVC.
-        if recoveryAttempts < Self.maxRecoveryAttempts {
-            recoveryAttempts += 1
+        if fallbacks.recoveryAttempts < Self.maxRecoveryAttempts {
+            fallbacks.recoveryAttempts += 1
             let codec = loader?.selection.videos.first?.codecID ?? 7
             let isNetwork = (400 ..< 600).contains(httpStatus) || event?.errorDomain == NSURLErrorDomain
             let failing = Self.variantAndMirror(event?.uri)
@@ -1264,16 +1276,16 @@ final class PlayerViewController: AVPlayerViewController, PlayerTeardown {
             let uriIsAudio = event?.uri.map { $0.contains("/am") } ?? false
             if !isNetwork {
                 if failedVideo?.isHDR == true || (failing == nil && loader?.selection.hasHDR == true && !uriIsAudio) {
-                    hdrFailed = true
+                    fallbacks.hdrFailed = true
                     overlay.showToast("HDR 播放失败，已切换为 SDR")
                 } else if audioIsSpecial, uriIsAudio || failing == nil {
-                    audioFailed = true
+                    fallbacks.audioFailed = true
                     overlay.showToast("杜比/无损音频播放失败，已切换为 AAC")
                 } else if codec != 7 {
-                    forceAVC = true
+                    fallbacks.forceAVC = true
                 }
             }
-            Log.player.error("item failed (HTTP \(httpStatus), codec \(codec)); recovering, attempt \(self.recoveryAttempts)")
+            Log.player.error("item failed (HTTP \(httpStatus), codec \(codec)); recovering, attempt \(self.fallbacks.recoveryAttempts)")
             startLoading(.current)
             return
         }
@@ -1310,7 +1322,12 @@ final class PlayerViewController: AVPlayerViewController, PlayerTeardown {
 
     private func showAlert(title: String, message: String, dismissesPlayer: Bool = true) {
         // The player may already be dismissed (Menu pressed while loading).
-        guard presentingViewController != nil, !isBeingDismissed, presentedViewController == nil else { return }
+        guard presentingViewController != nil, !isBeingDismissed else { return }
+        guard presentedViewController == nil else {
+            // Something else is on screen (e.g. the story chooser still leaving): say why at least.
+            overlay.showToast(title + "：" + (message.split(separator: "\n").first.map(String.init) ?? ""))
+            return
+        }
         let alert = UIAlertController(title: title, message: message, preferredStyle: .alert)
         alert.addAction(UIAlertAction(title: "好", style: .cancel) { [weak self] _ in
             if dismissesPlayer { self?.dismiss(animated: true) }
