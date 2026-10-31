@@ -15,44 +15,48 @@ final class PlayerViewController: AVPlayerViewController, PlayerTeardown {
         case at(Double)
     }
 
-    private var request: PlayRequest
+    /// Where the player is between items (see `PlaybackPhase`). `request` and `story` read and write its target, so
+    /// during a switch they're the page being loaded and the attached item's are out of reach until a rollback.
+    private var phase: PlayerPhase
+    private var request: PlayRequest {
+        get { phase.target.request }
+        set { phase.target.request = newValue }
+    }
     private var loadTask: Task<Void, Never>?
     /// Strongly held for the item it serves (AVAssetResourceLoader keeps its delegate weakly).
     private var loader: DashResourceLoader?
     private var playInfo: PlayInfo?
     /// nil = adaptive (自动).
     private var manualQuality: Int?
-    /// Set after a decode failure on HEVC/AV1: retry this page with AVC.
-    private var forceAVC = false
-    /// Set after an HDR/DV variant failed: retry this page in SDR (HDR 播放失败时自动降级).
-    private var hdrFailed = false
-    /// Set after Dolby/FLAC audio failed: retry with AAC.
-    private var audioFailed = false
+    /// What failed on this page and is avoided when it reloads (see `PlaybackFallbacks`); kept with the page, so a
+    /// switch that fails goes back to them too.
+    private var fallbacks: PlaybackFallbacks {
+        get { phase.target.fallbacks }
+        set { phase.target.fallbacks = newValue }
+    }
     private var showsDebug = false
     private var debugTimer: Timer?
     private var errorLogObserver: NSObjectProtocol?
     /// The display manager the criteria were set on, so they can be cleared even after the window is gone.
     private weak var displayManager: AVDisplayManager?
-    private var recoveryAttempts = 0
     private var timeObserver: Any?
     private var itemObservations: [NSKeyValueObservation] = []
     private var endObserver: NSObjectProtocol?
     private var backgroundObserver: NSObjectProtocol?
     private var lastReportedSecond = -1
     private var finishedReported = false
-    /// True while the next page's item is loading (the old item is still attached).
-    private var isSwitchingPage = false
-    /// What the attached item plays: a switch that fails goes back to it, so progress isn't saved under the page
-    /// (or video) that never loaded.
-    private var attachedRequest: PlayRequest?
-    /// The story position of the attached item (a story module that fails to load goes back to it too).
-    private var attachedStory: StorySession?
+    /// True while the next page's item is loading (the old item is still attached and paused).
+    private var isSwitchingPage: Bool { phase.isSwitching }
     private let overlay = PlayerOverlayView()
     /// 高能进度条 above the scrubber (shown with the transport bar), and its busiest moments as markers.
     private let heatBar = HeatBarView()
     private var heatMarkers: [AVTimedMetadataGroup] = []
     /// 互动视频: the story being played (nil for ordinary videos), and whether a module ended waiting for a choice.
-    private var story: StorySession?
+    /// Another module only through `playStoryModule`, so the one that ended stays the attached item's.
+    private var story: StorySession? {
+        get { phase.target.story }
+        set { phase.target.story = newValue }
+    }
     private var storyTask: Task<Void, Never>?
     private var awaitingStoryChoice = false
     private var subtitles: [API.Subtitle] = []
@@ -97,7 +101,7 @@ final class PlayerViewController: AVPlayerViewController, PlayerTeardown {
     private static let maxRecoveryAttempts = 2
 
     init(request: PlayRequest) {
-        self.request = request
+        phase = .starting(PlaybackTarget(request: request, story: nil))
         super.init(nibName: nil, bundle: nil)
     }
 
@@ -231,9 +235,10 @@ final class PlayerViewController: AVPlayerViewController, PlayerTeardown {
 
     private func startLoading(_ start: StartPosition) {
         loadTask?.cancel()
-        // A reload (quality, codec) while the next page is loading: "where it is now" is the old page's time.
+        // A reload (quality, codec) while another page is loading: "where it is now" is the old page's time. (While
+        // a related video is still being looked up the target is the video playing, and its time is right.)
         var start = start
-        if isSwitchingPage, case .current = start { start = .resume }
+        if case .current = start, let attached = phase.attached, isSwitchingPage, attached.request.cid != request.cid { start = .resume }
         loadTask = Task { [weak self] in await self?.load(start) }
     }
 
@@ -255,6 +260,7 @@ final class PlayerViewController: AVPlayerViewController, PlayerTeardown {
             }
             if request.isChargeOnly, info.isPreview {
                 showChargeNotice()
+                rollBackSwitch()
                 return
             }
             if request.isPGC, info.isPreview {
@@ -303,10 +309,17 @@ final class PlayerViewController: AVPlayerViewController, PlayerTeardown {
             skips = (info.skips.isEmpty ? request.current.skips : info.skips)
                 + (sponsorSkips.cid == request.cid ? sponsorSkips.ranges : [])
             skipped = []
+            let isNewPage = extrasCID != request.cid
+            if isNewPage {
+                // The new page has its own chapters and 高能时刻 (the item is marked before its extras load).
+                chapterGroups = []
+                heatMarkers = []
+                heatBar.set(nil, duration: 0)
+            }
             attach(item, loader: newLoader)
             applyDisplayPlan()
             applySkipMarkers(to: item)
-            if extrasCID != request.cid {
+            if isNewPage {
                 extrasCID = request.cid
                 loadPageExtras(item: item)
                 updateInfoPanel()
@@ -327,9 +340,7 @@ final class PlayerViewController: AVPlayerViewController, PlayerTeardown {
             }
         } catch {
             guard !BiliClient.isCancellation(error), !Task.isCancelled else { return }
-            // A failed page / module switch, as opposed to a quality change or recovery of the item still playing.
-            let wasSwitching = isSwitchingPage
-            isSwitchingPage = false
+            // Read before rolling back: the reason belongs to what failed to load.
             if request.isChargeOnly, case BiliError.api = error {
                 showChargeNotice()
             } else if case BiliError.api(-10403, _) = error {
@@ -337,7 +348,8 @@ final class PlayerViewController: AVPlayerViewController, PlayerTeardown {
             } else {
                 showAlert(title: "无法播放", message: error.localizedDescription)
             }
-            if let item = player?.currentItem, let attachedRequest { rollBack(to: attachedRequest, item: item, wasSwitching: wasSwitching) }
+            // A failed quality change or recovery leaves the item as it is; a failed switch goes back to it.
+            rollBackSwitch()
         }
     }
 
@@ -377,13 +389,13 @@ final class PlayerViewController: AVPlayerViewController, PlayerTeardown {
 
     /// HDR only when the device/display path can show it and SDR isn't forced.
     private var hdrAllowed: Bool {
-        !hdrFailed && !AppSettings.shared.forceSDR && AVPlayer.eligibleForHDRPlayback
+        !fallbacks.hdrFailed && !AppSettings.shared.forceSDR && AVPlayer.eligibleForHDRPlayback
     }
 
     private func preferences() -> StreamPreferences {
         let settings = AppSettings.shared
         var supported: Set<Int> = [CodecPreference.avc.codecID]
-        if !forceAVC {
+        if !fallbacks.forceAVC {
             if VTIsHardwareDecodeSupported(kCMVideoCodecType_HEVC) { supported.insert(CodecPreference.hevc.codecID) }
             if VTIsHardwareDecodeSupported(kCMVideoCodecType_AV1) { supported.insert(CodecPreference.av1.codecID) }
         }
@@ -394,17 +406,15 @@ final class PlayerViewController: AVPlayerViewController, PlayerTeardown {
                                  filterHighFramerate: settings.filterHighFramerate,
                                  allowHDR: hdrAllowed && settings.enableHDR,
                                  allowDolbyVision: hdrAllowed && settings.enableDolbyVision && AVPlayer.availableHDRModes.contains(.dolbyVision),
-                                 preferDolbyAudio: settings.enableDolbyAudio && !audioFailed,
-                                 preferLosslessAudio: settings.enableLosslessAudio && !audioFailed,
+                                 preferDolbyAudio: settings.enableDolbyAudio && !fallbacks.audioFailed,
+                                 preferLosslessAudio: settings.enableLosslessAudio && !fallbacks.audioFailed,
                                  manualQuality: manualQuality)
     }
 
     private func attach(_ item: AVPlayerItem, loader newLoader: DashResourceLoader?) {
         teardownItem()
         loader = newLoader
-        isSwitchingPage = false
-        attachedRequest = request
-        attachedStory = story
+        phase.attach()
         if let player {
             player.replaceCurrentItem(with: item)
         } else {
@@ -538,14 +548,18 @@ final class PlayerViewController: AVPlayerViewController, PlayerTeardown {
     /// Saves the position to the account's history. After the page finished, the full duration was
     /// reported; later calls for the same page are skipped so they can't overwrite it.
     private func reportProgress(finished: Bool = false) {
-        guard let player, request.aid > 0, BiliClient.shared.currentAccount != nil, !finishedReported, !isSwitchingPage else { return }
+        // Under the ids of what the attached item plays (never those of a page still loading).
+        guard case let .playing(attached) = phase, let player, attached.request.aid > 0, BiliClient.shared.currentAccount != nil,
+              !finishedReported
+        else { return }
         let current = player.currentTime().seconds
         let duration = player.currentItem?.duration.seconds ?? 0
         let seconds = Int(finished && duration.isFinite ? duration : (current.isFinite ? current : 0))
         guard seconds > 0 else { return }
         lastReportedSecond = seconds
         finishedReported = finished
-        let (aid, cid, epID, seasonID, seasonType) = (request.aid, request.cid, request.epID, request.seasonID, request.seasonType)
+        let r = attached.request
+        let (aid, cid, epID, seasonID, seasonType) = (r.aid, r.cid, r.epID, r.seasonID, r.seasonType)
         Task.detached {
             do {
                 if seasonID > 0 {
@@ -584,8 +598,9 @@ final class PlayerViewController: AVPlayerViewController, PlayerTeardown {
         guard request.entries.indices.contains(index) else { return }
         Log.player.info("switching to page \(index + 1)/\(self.request.entries.count)")
         reportProgress()
-        request.pageIndex = index
-        beginSwitch()
+        var next = phase.target
+        next.request.pageIndex = index
+        beginSwitch(to: next)
         startLoading(.resume)
     }
 
@@ -594,59 +609,66 @@ final class PlayerViewController: AVPlayerViewController, PlayerTeardown {
         guard !isSwitchingPage else { return }
         Log.player.info("autoplay related \(item.bvid, privacy: .public)")
         reportProgress()
-        beginSwitch()
+        // The video is known only after the lookup: meanwhile the target stays what's playing.
+        beginSwitch(to: phase.target)
         relatedNext = nil
         relatedTask?.cancel()
         relatedTask = Task { [weak self] in
             let detail = try? await API.videoDetail(bvid: item.bvid)
             guard let self, !Task.isCancelled else { return }
+            // A reload meanwhile (quality, recovery) attached the current video again: that's what plays now, and
+            // something else may follow it.
+            guard self.isSwitchingPage else {
+                self.loadRelatedNext()
+                return
+            }
             // Missing, or a 番剧 episode (needs the season flow): stop here as if nothing followed.
             guard let detail, detail.redirectEpID == 0, !detail.pages.isEmpty else {
-                self.isSwitchingPage = false
                 self.overlay.showToast("无法播放：\(item.title)")
+                // Another related video may follow instead (never this one again).
+                self.playedVideos.insert(item.bvid)
+                self.rollBackSwitch()
+                // Already ended (autoplay): nothing would start the next one, so it plays as soon as it's found.
+                self.loadRelatedNext(playWhenFound: self.attachedItemEnded)
                 // Chosen from 即将播放 before the end: carry on with this one (no-op once it has ended).
                 self.player?.play()
                 return
             }
-            self.request = PlayRequest(detail: detail, pageIndex: 0, resumeLastPage: true)
-            self.sponsorSkips = (0, [])
             self.endStory()
+            self.beginSwitch(to: PlaybackTarget(request: PlayRequest(detail: detail, pageIndex: 0, resumeLastPage: true), story: nil))
+            self.sponsorSkips = (0, [])
             self.startLoading(.resume)
         }
     }
 
-    /// A switch that failed: back to what the attached item plays, with what `beginSwitch` cleared for it.
-    private func rollBack(to attached: PlayRequest, item: AVPlayerItem, wasSwitching: Bool) {
-        request = attached
-        // Only when it was leaving a module: a failed quality change mid-module mustn't offer the choices early.
-        if wasSwitching, story != nil || attachedStory != nil {
-            story = attachedStory
-            // The old module has ended (that's why it switched): its choices again.
-            awaitingStoryChoice = story != nil
-            updateContextualActions(upNext: false)
-        }
-        if extrasCID != request.cid {
-            extrasCID = request.cid
-            loadPageExtras(item: item)
-            applySkipMarkers(to: item)
-        }
+    /// The attached item played to its end (what `didFinishPage` acts on).
+    private var attachedItemEnded: Bool {
+        guard let item = player?.currentItem, item.duration.isNumeric else { return false }
+        return item.currentTime().seconds >= item.duration.seconds - 0.5
     }
 
-    /// State that belongs to the page being left.
-    private func beginSwitch() {
-        // The next page has its own 高能时刻 (the current item is re-marked before its extras load).
-        heatMarkers = []
-        heatBar.set(nil, duration: 0)
+    /// A switch that didn't happen: back to what the attached item plays (its extras were never cleared).
+    /// Not switching (a failed quality change or recovery, or nothing attached yet): nothing to undo.
+    private func rollBackSwitch() {
+        guard phase.rollBack() != nil else { return }
+        // A module only switches once it has ended: its choices again. (Other switches never happen in a story.)
+        awaitingStoryChoice = story != nil
+        updateContextualActions(upNext: false)
+    }
+
+    /// Leaves the attached item for `next`: the only way to change pages, videos or story modules, so the attached
+    /// item's record stays as it was if `next` never loads. Also resets what belongs to the page being left.
+    private func beginSwitch(to next: PlaybackTarget) {
+        // Chapters, 高能时刻 and the other extras stay until the new page attaches: a switch that fails keeps them.
         boostedFrom = nil
         overlay.setBoost(nil)
-        extrasCID = 0
         lastReportedSecond = -1
         finishedReported = false
-        recoveryAttempts = 0
-        forceAVC = false
-        hdrFailed = false
-        audioFailed = false
-        isSwitchingPage = true
+        var next = next
+        // Another page or video starts with nothing ruled out; the same one (a related video still being looked
+        // up) keeps what already failed.
+        if next.request.cid != phase.attached?.request.cid { next.fallbacks = PlaybackFallbacks() }
+        phase.beginSwitch(to: next)
         updateContextualActions(upNext: false)
         player?.pause()
     }
@@ -963,7 +985,7 @@ final class PlayerViewController: AVPlayerViewController, PlayerTeardown {
     }
 
     /// The related video to autoplay after the last part of a UGC video.
-    private func loadRelatedNext() {
+    private func loadRelatedNext(playWhenFound: Bool = false) {
         relatedNext = nil
         relatedTask?.cancel()
         let bvid = request.bvid
@@ -972,6 +994,9 @@ final class PlayerViewController: AVPlayerViewController, PlayerTeardown {
         relatedTask = Task { [weak self] in
             guard let related = try? await API.related(bvid: bvid), let self, !Task.isCancelled, self.request.bvid == bvid else { return }
             self.relatedNext = AutoPlay.next(after: bvid, related: related, played: self.playedVideos)
+            if playWhenFound, let next = self.relatedNext, self.attachedItemEnded, !self.isSwitchingPage {
+                self.playRelated(next)
+            }
         }
     }
 
@@ -1007,7 +1032,7 @@ final class PlayerViewController: AVPlayerViewController, PlayerTeardown {
             let multiPart = request.entries.count > 1
             Task { [weak self] in
                 guard let segments = try? await API.sponsorSegments(bvid: bvid, cid: cid, multiPart: multiPart), !segments.isEmpty,
-                      let self, self.request.cid == cid else { return }
+                      let self, self.extrasCID == cid else { return }
                 self.sponsorSkips = (cid, segments)
                 self.skips += segments
                 if let current = self.player?.currentItem { self.applySkipMarkers(to: current) }
@@ -1016,11 +1041,11 @@ final class PlayerViewController: AVPlayerViewController, PlayerTeardown {
         }
         subtitleTask = Task { [weak self] in
             await AccountDanmakuRules.refreshIfNeeded()
-            if let self, self.request.cid == cid, AccountDanmakuRules.cached.count != self.appliedRuleCount {
+            if let self, self.extrasCID == cid, AccountDanmakuRules.cached.count != self.appliedRuleCount {
                 self.appliedRuleCount = AccountDanmakuRules.cached.count
                 self.overlay.applyAccountRules(AccountDanmakuRules.cached)
             }
-            guard let info = try? await API.playerInfo(bvid: bvid, cid: cid), !Task.isCancelled, let self, self.request.cid == cid else { return }
+            guard let info = try? await API.playerInfo(bvid: bvid, cid: cid), !Task.isCancelled, let self, self.extrasCID == cid else { return }
             let chapters = API.chapters(fromPlayerInfo: info)
             self.chapterGroups = chapters.map { chapter in
                 AVTimedMetadataGroup(items: [Self.metadataItem(.commonIdentifierTitle, chapter.title as NSString)],
@@ -1029,7 +1054,10 @@ final class PlayerViewController: AVPlayerViewController, PlayerTeardown {
             }
             if let current = self.player?.currentItem { self.applyChapterGroups(to: current) }
             self.subtitles = API.subtitles(fromPlayerInfo: info)
-            if !self.request.isPGC, let version = API.storyGraphVersion(fromPlayerInfo: info) { self.startStory(version: version) }
+            // The story is the target's: not while another page is loading (this page then plays as an ordinary video).
+            if !self.request.isPGC, !self.isSwitchingPage, let version = API.storyGraphVersion(fromPlayerInfo: info) {
+                self.startStory(version: version)
+            }
             if let mask = API.danmakuMask(fromPlayerInfo: info) {
                 self.overlay.setMask(mask)
                 Log.player.info("danmaku mask available (\(mask.fps) fps)")
@@ -1057,7 +1085,7 @@ final class PlayerViewController: AVPlayerViewController, PlayerTeardown {
         storyTask = Task { [weak self] in
             do {
                 let start = try await API.storyEdge(aid: aid, bvid: bvid, graphVersion: version, edgeID: 0)
-                guard let self, !Task.isCancelled, self.request.aid == aid else { return }
+                guard let self, !Task.isCancelled, !self.isSwitchingPage, self.request.aid == aid else { return }
                 self.story = StorySession(aid: aid, bvid: bvid, graphVersion: version, start: start, cid: cid)
                 Log.player.info("interactive video: graph \(version), start module \(start.edgeID) with \(start.questions.count) question(s)")
             } catch {
@@ -1119,8 +1147,7 @@ final class PlayerViewController: AVPlayerViewController, PlayerTeardown {
             session.edge = step.edge
             session.cid = step.cid
             session.state = step.state
-            story = session
-            playStoryModule(cid: step.cid, title: step.edge.title)
+            playStoryModule(session, title: step.edge.title)
             return
         case let .choice(choice):
             session.history.append(.init(edge: session.edge, cid: session.cid, state: session.state))
@@ -1148,8 +1175,7 @@ final class PlayerViewController: AVPlayerViewController, PlayerTeardown {
                     next.cid = cid
                     next.state.enter(edge)
                 }
-                self.story = next
-                self.playStoryModule(cid: cid, title: edge.title)
+                self.playStoryModule(next, title: edge.title)
             } catch {
                 guard !BiliClient.isCancellation(error), let self else { return }
                 Log.player.error("story module \(edgeID) failed: \(error.localizedDescription, privacy: .public)")
@@ -1160,13 +1186,14 @@ final class PlayerViewController: AVPlayerViewController, PlayerTeardown {
         }
     }
 
-    private func playStoryModule(cid: Int, title: String) {
-        guard let story else { return }
-        Log.player.info("story → module \(story.edge.edgeID) (cid \(cid))")
+    private func playStoryModule(_ module: StorySession, title: String) {
+        Log.player.info("story → module \(module.edge.edgeID) (cid \(module.cid))")
         reportProgress()
-        request.entries = [PlayRequest.Entry(aid: story.aid, bvid: story.bvid, cid: cid, epID: 0, title: title, isVIP: false, skips: [])]
-        request.pageIndex = 0
-        beginSwitch()
+        var next = phase.target
+        next.story = module
+        next.request.entries = [PlayRequest.Entry(aid: module.aid, bvid: module.bvid, cid: module.cid, epID: 0, title: title, isVIP: false, skips: [])]
+        next.request.pageIndex = 0
+        beginSwitch(to: next)
         if !title.isEmpty { overlay.showToast(title) }
         startLoading(.at(0))
     }
@@ -1178,7 +1205,7 @@ final class PlayerViewController: AVPlayerViewController, PlayerTeardown {
         guard AppSettings.shared.heatBar, let duration = playInfo?.duration, duration > 0 else { return }
         let cid = request.cid
         overlay.startHeat(duration: duration) { [weak self] curve, complete in
-            guard let self, self.request.cid == cid else { return }
+            guard let self, self.extrasCID == cid else { return }
             self.heatBar.set(curve, duration: duration)
             guard complete, let curve else { return }
             let peaks = curve.highlights(count: 3, spacing: max(30, duration / 12), duration: duration)
@@ -1196,9 +1223,9 @@ final class PlayerViewController: AVPlayerViewController, PlayerTeardown {
         overlay.setSubtitles([])
         updateMenus()
         guard let subtitle else { return }
-        let cid = request.cid
+        let cid = extrasCID
         Task { [weak self] in
-            guard let lines = try? await API.subtitleLines(subtitle), let self, self.request.cid == cid,
+            guard let lines = try? await API.subtitleLines(subtitle), let self, self.extrasCID == cid,
                   self.selectedSubtitle == subtitle
             else { return }
             self.overlay.setSubtitles(lines)
@@ -1238,8 +1265,8 @@ final class PlayerViewController: AVPlayerViewController, PlayerTeardown {
         let httpStatus = event?.errorStatusCode ?? 0
         // Signed CDN URLs expire (~2h) and mirrors die: fetch fresh URLs once and continue in place.
         // A non-HTTP failure on HEVC/AV1 is treated as a decode problem: retry with AVC.
-        if recoveryAttempts < Self.maxRecoveryAttempts {
-            recoveryAttempts += 1
+        if fallbacks.recoveryAttempts < Self.maxRecoveryAttempts {
+            fallbacks.recoveryAttempts += 1
             let codec = loader?.selection.videos.first?.codecID ?? 7
             let isNetwork = (400 ..< 600).contains(httpStatus) || event?.errorDomain == NSURLErrorDomain
             let failing = Self.variantAndMirror(event?.uri)
@@ -1249,16 +1276,16 @@ final class PlayerViewController: AVPlayerViewController, PlayerTeardown {
             let uriIsAudio = event?.uri.map { $0.contains("/am") } ?? false
             if !isNetwork {
                 if failedVideo?.isHDR == true || (failing == nil && loader?.selection.hasHDR == true && !uriIsAudio) {
-                    hdrFailed = true
+                    fallbacks.hdrFailed = true
                     overlay.showToast("HDR 播放失败，已切换为 SDR")
                 } else if audioIsSpecial, uriIsAudio || failing == nil {
-                    audioFailed = true
+                    fallbacks.audioFailed = true
                     overlay.showToast("杜比/无损音频播放失败，已切换为 AAC")
                 } else if codec != 7 {
-                    forceAVC = true
+                    fallbacks.forceAVC = true
                 }
             }
-            Log.player.error("item failed (HTTP \(httpStatus), codec \(codec)); recovering, attempt \(self.recoveryAttempts)")
+            Log.player.error("item failed (HTTP \(httpStatus), codec \(codec)); recovering, attempt \(self.fallbacks.recoveryAttempts)")
             startLoading(.current)
             return
         }
@@ -1295,7 +1322,12 @@ final class PlayerViewController: AVPlayerViewController, PlayerTeardown {
 
     private func showAlert(title: String, message: String, dismissesPlayer: Bool = true) {
         // The player may already be dismissed (Menu pressed while loading).
-        guard presentingViewController != nil, !isBeingDismissed, presentedViewController == nil else { return }
+        guard presentingViewController != nil, !isBeingDismissed else { return }
+        guard presentedViewController == nil else {
+            // Something else is on screen (e.g. the story chooser still leaving): say why at least.
+            overlay.showToast(title + "：" + (message.split(separator: "\n").first.map(String.init) ?? ""))
+            return
+        }
         let alert = UIAlertController(title: title, message: message, preferredStyle: .alert)
         alert.addAction(UIAlertAction(title: "好", style: .cancel) { [weak self] _ in
             if dismissesPlayer { self?.dismiss(animated: true) }
