@@ -39,7 +39,7 @@ jobs:
         with:
           path: _site
       - id: deployment
-        uses: actions/deploy-pages@v4
+        uses: actions/deploy-pages@v5
       # IndexNow: tells Bing (and other participating engines) the pages changed. Google doesn't take part; it
       # reads the sitemap submitted in Search Console.
       - name: Notify search engines
