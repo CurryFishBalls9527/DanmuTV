@@ -34,7 +34,7 @@ jobs:
           mkdir -p _site/assets/screenshots
           cp docs/screenshots/*.jpg _site/assets/screenshots/
           sed -i "s/__LASTMOD__/$(git log -1 --format=%cs -- site docs/screenshots)/g" _site/sitemap.xml
-      - uses: actions/configure-pages@v5
+      - uses: actions/configure-pages@v6
       - uses: actions/upload-pages-artifact@v3
         with:
           path: _site
