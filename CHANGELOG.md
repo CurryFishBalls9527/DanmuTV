@@ -15,6 +15,13 @@ All notable changes to this project are documented here. The format follows
   between pages): it looks further, and ends the list instead of stalling if nothing new comes.
 - Casting: GetMediaInfo / GetPositionInfo return the sender's DIDL metadata as XML again; plain metadata with `&amp;`
   in a URL was echoed as escaped text.
+- Player: a long video recovers every time its signed URLs expire (about every 2 hours), not just the first two times:
+  recovery attempts come back after two minutes of good playback.
+- Danmaku: after switching profiles, the previous profile's cloud block list no longer filters the new profile's
+  danmaku (also when fetching the new list fails, or both lists have the same length).
+- Casting: 退出投屏 on the phone also closes a player that is in picture in picture.
+- A video whose part list comes back empty plays from its own cid, or shows an error, instead of crashing; a
+  `danmutv://` link with a huge negative `p` / `play` number no longer crashes the app.
 - Malformed server data no longer crashes the app: a huge sidx `first_offset` (the mirror fails over instead), an
   infinite mask viewBox, `nan` / `inf` / huge play counts, and overflowing duration strings.
 - Player: an error that can't be shown as an alert (something else still on screen, e.g. the story chooser leaving)
