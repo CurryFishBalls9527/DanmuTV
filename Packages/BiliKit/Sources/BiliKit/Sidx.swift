@@ -59,8 +59,14 @@ public struct SegmentIndex: Equatable, Sendable {
         }
         try r.skip(2) // reserved
         let count = Int(try r.u16())
+        // A hostile first_offset near Int.max must fail the mirror, not trap on overflow.
+        func add(_ a: Int, _ b: Int) throws -> Int {
+            let (sum, overflow) = a.addingReportingOverflow(b)
+            guard !overflow else { throw ParseError.offsetOverflow }
+            return sum
+        }
         guard let first = Int(exactly: firstOffset) else { throw ParseError.offsetOverflow }
-        var offset = boxEnd + 1 + first
+        var offset = try add(try add(boxEnd, 1), first)
         var segments: [Segment] = []
         segments.reserveCapacity(count)
         for _ in 0 ..< count {
@@ -70,7 +76,7 @@ public struct SegmentIndex: Equatable, Sendable {
             guard ref & 0x8000_0000 == 0 else { throw ParseError.nestedIndex }
             let length = Int(ref & 0x7FFF_FFFF)
             segments.append(Segment(offset: offset, length: length, duration: Double(duration) / Double(timescale)))
-            offset += length
+            offset = try add(offset, length)
         }
         self.segments = segments
     }

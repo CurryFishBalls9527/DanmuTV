@@ -309,10 +309,11 @@ final class PlayerOverlayView: UIView {
         appliedMaskTime = -1
     }
 
-    /// Applies (possibly changed) account block rules to the loaded comments.
+    /// Applies (possibly changed) account block rules to the loaded comments. Rebuilt rather than added to, so rules
+    /// the account no longer has stop applying.
     func applyAccountRules(_ rules: [JSON]) {
         guard AppSettings.shared.danmakuSyncAccountFilter else { return }
-        filter.addAccountRules(rules)
+        filter = Self.danmakuFilter(accountRules: rules)
         source.updateFilter(filter)
     }
 

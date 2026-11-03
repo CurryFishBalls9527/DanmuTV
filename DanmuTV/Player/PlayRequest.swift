@@ -43,6 +43,10 @@ struct PlayRequest {
             Entry(aid: aid, bvid: detail.item.bvid, cid: $0.cid, epID: 0,
                   title: multi ? "P\($0.page) \($0.part)" : detail.item.title, isVIP: false, skips: [])
         }
+        if entries.isEmpty, detail.item.cid > 0 {
+            // No part list (e.g. an empty pagelist fallback), but the video's own cid is enough to play.
+            entries = [Entry(aid: aid, bvid: detail.item.bvid, cid: detail.item.cid, epID: 0, title: detail.item.title, isVIP: false, skips: [])]
+        }
         self.pageIndex = pageIndex
         title = detail.item.title
         ownerName = detail.item.ownerName
@@ -67,7 +71,12 @@ struct PlayRequest {
         if season.lastEpisodeID > 0 { pgcResume = (season.lastEpisodeID, season.lastTime) }
     }
 
-    var current: Entry { entries[min(max(0, pageIndex), max(0, entries.count - 1))] }
+    /// The part / episode to play. With nothing to play (the server sent no parts) a placeholder whose cid 0 fails to
+    /// load with an error, instead of trapping on `entries[0]`.
+    var current: Entry {
+        guard !entries.isEmpty else { return Entry(aid: 0, bvid: "", cid: 0, epID: 0, title: title, isVIP: false, skips: []) }
+        return entries[min(max(0, pageIndex), entries.count - 1)]
+    }
     var isPGC: Bool { seasonID > 0 }
     var aid: Int { current.aid }
     var bvid: String { current.bvid }

@@ -58,13 +58,18 @@ public enum SOAP {
     /// DIDL metadata without `_nva_ext_`: the `longDescription` (where newer phones put it) is emptied, and any
     /// `_nva_ext_=` parameter elsewhere (e.g. the URI repeated in `<res>`) is removed, escaped or not.
     public static func redactingNvaExt(metadata: String) -> String {
-        func strip(_ xml: String) -> String {
-            guard let regex = try? NSRegularExpression(pattern: "(<(?:[A-Za-z0-9_.-]+:)?longDescription\\b[^>]*>).*?(</(?:[A-Za-z0-9_.-]+:)?longDescription>)",
-                                                       options: [.dotMatchesLineSeparators, .caseInsensitive]) else { return "" }
-            return regex.stringByReplacingMatches(in: xml, range: NSRange(xml.startIndex..., in: xml), withTemplate: "$1$2")
+        // Both tag spellings, so it doesn't matter whether the sender escaped the DIDL (or mixed the two). Deciding
+        // "escaped" by whether unescaping changes anything is wrong: plain DIDL has `&amp;` between query parameters.
+        let prefix = "(?:[A-Za-z0-9_.-]+:)?"
+        let patterns = [
+            "(<\(prefix)longDescription\\b[^>]*>).*?(</\(prefix)longDescription>)",
+            "(&lt;\(prefix)longDescription\\b.*?&gt;).*?(&lt;/\(prefix)longDescription&gt;)",
+        ]
+        var stripped = metadata
+        for pattern in patterns {
+            guard let regex = try? NSRegularExpression(pattern: pattern, options: [.dotMatchesLineSeparators, .caseInsensitive]) else { return "" }
+            stripped = regex.stringByReplacingMatches(in: stripped, range: NSRange(stripped.startIndex..., in: stripped), withTemplate: "$1$2")
         }
-        let inner = unescape(metadata)
-        let stripped = inner == metadata ? strip(metadata) : escape(strip(inner))
         return verified(scrubNvaExt(stripped))
     }
 

@@ -65,4 +65,12 @@ enum PictureInPicture {
         player = nil
         current.teardown()
     }
+
+    /// The phone stopped casting: a player in the corner goes away too (it's not on screen for `dismissPlayers`).
+    static func endActive() {
+        guard isActive, let current = player else { return }
+        isActive = false
+        player = nil
+        current.teardown()
+    }
 }

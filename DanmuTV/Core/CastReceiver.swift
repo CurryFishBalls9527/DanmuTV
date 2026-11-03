@@ -181,8 +181,7 @@ final class CastReceiver {
         case "Seek":
             if let seconds = json?["seekTs"].double { player?.castSeek(to: seconds) }
         case "Stop":
-            // Only a player: never a login sheet or alert that happens to be up.
-            if PlayerLauncher.isPlayerShowing { PlayerLauncher.dismissPlayers {} }
+            stopPlayback()
         case "SwitchSpeed":
             if let rate = json?["speed"].double, rate > 0 { player?.castSetSpeed(rate) }
         case "SwitchDanmaku":
@@ -191,6 +190,13 @@ final class CastReceiver {
             break
         }
         session.reply(nil)
+    }
+
+    /// 退出投屏 on the phone: closes the player, full screen or in picture in picture. Only a player: never a login
+    /// sheet or alert that happens to be up.
+    private func stopPlayback() {
+        PictureInPicture.endActive()
+        if PlayerLauncher.isPlayerShowing { PlayerLauncher.dismissPlayers {} }
     }
 
     // MARK: UPnP (SOAP)
@@ -225,7 +231,7 @@ final class CastReceiver {
         case ("AVTransport", "Stop"), ("NirvanaControl", "Stop"):
             currentURI = ""
             currentMetadata = ""
-            if PlayerLauncher.isPlayerShowing { PlayerLauncher.dismissPlayers {} }
+            stopPlayback()
         case ("AVTransport", "Seek"), ("NirvanaControl", "Seek"):
             if let target = value("Target"), let seconds = SOAP.seconds(fromTime: target) { player?.castSeek(to: seconds) }
         case ("NirvanaControl", "SetSpeed"):

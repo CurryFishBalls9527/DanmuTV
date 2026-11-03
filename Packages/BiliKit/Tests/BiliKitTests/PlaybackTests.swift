@@ -40,6 +40,26 @@ final class SidxTests: XCTestCase {
         XCTAssertEqual(index.segments.map(\.duration), [2.0, 1.5])
     }
 
+    func testHugeFirstOffsetThrowsInsteadOfTrapping() {
+        var box = Data()
+        func u32(_ v: UInt32) { withUnsafeBytes(of: v.bigEndian) { box.append(contentsOf: $0) } }
+        func u64(_ v: UInt64) { withUnsafeBytes(of: v.bigEndian) { box.append(contentsOf: $0) } }
+        u32(0) // size, patched below
+        box.append(contentsOf: Array("sidx".utf8))
+        box.append(contentsOf: [1, 0, 0, 0]) // version 1
+        u32(1) // reference id
+        u32(1000) // timescale
+        u64(0) // earliest pts
+        u64(UInt64(Int.max) - 5) // first_offset: fits in Int, but not once added to the box end
+        box.append(contentsOf: [0, 0, 0, 1]) // reserved + count 1
+        u32(100); u32(2000); u32(0)
+        let size = UInt32(box.count)
+        box.replaceSubrange(0 ..< 4, with: withUnsafeBytes(of: size.bigEndian) { Data($0) })
+        XCTAssertThrowsError(try SegmentIndex(data: box, boxEnd: 999 + box.count)) { error in
+            XCTAssertEqual(error as? SegmentIndex.ParseError, .offsetOverflow)
+        }
+    }
+
     func testRejectsGarbage() {
         XCTAssertThrowsError(try SegmentIndex(data: Data("not a box at all".utf8), boxEnd: 15))
         XCTAssertThrowsError(try SegmentIndex(data: Data([0, 0, 0, 40] + Array("sidx".utf8)), boxEnd: 7))

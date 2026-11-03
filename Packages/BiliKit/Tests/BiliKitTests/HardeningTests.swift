@@ -56,6 +56,18 @@ final class HardeningTests: XCTestCase {
         XCTAssertFalse(SOAP.redactingNvaExt(metadata: SOAP.escape(didl)).contains("SECRET"))
     }
 
+    func testPlainMetadataWithEntitiesStaysXML() {
+        // CastReceiver hands over metadata already unescaped once; `&amp;` in <res> doesn't make it escaped text.
+        let didl = #"<DIDL-Lite><item><dc:title>t</dc:title><res>http://e.com/a.mp4?a=1&amp;b=2</res></item></DIDL-Lite>"#
+        XCTAssertEqual(SOAP.redactingNvaExt(metadata: didl), didl)
+        let escaped = SOAP.escape(didl)
+        XCTAssertEqual(SOAP.redactingNvaExt(metadata: escaped), escaped)
+
+        // Escaped DIDL inside raw markup still has its longDescription emptied.
+        let secret = #"<DIDL-Lite><item><upnp:longDescription>SECRET</upnp:longDescription></item></DIDL-Lite>"#
+        XCTAssertFalse(SOAP.redactingNvaExt(metadata: "<x>" + SOAP.escape(secret) + "</x>").contains("SECRET"))
+    }
+
     func testMP4LargesizeOverflowDoesNotTrap() {
         var data = Data([0, 0, 0, 1]) + Data("moov".utf8)
         data += Data([0x7F, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF])

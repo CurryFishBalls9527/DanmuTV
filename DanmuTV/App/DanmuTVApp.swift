@@ -167,7 +167,8 @@ struct RootView: View {
             guard let id = Int(arg) else { return }
             bangumiPath.append(SeasonRoute(seasonID: id))
             // `?play=N` also starts episode N (1-based).
-            if let n = URLComponents(url: url, resolvingAgainstBaseURL: false)?.queryItems?.first(where: { $0.name == "play" })?.value.flatMap(Int.init) {
+            if let n = URLComponents(url: url, resolvingAgainstBaseURL: false)?.queryItems?.first(where: { $0.name == "play" })?.value.flatMap(Int.init),
+               n > 0 { // also keeps `n - 1` from overflowing on Int.min
                 Task {
                     guard let season = try? await API.season(seasonID: id), season.episodes.indices.contains(n - 1) else { return }
                     PlayerLauncher.play(PlayRequest(season: season, episodes: season.episodes, index: n - 1))
@@ -209,7 +210,8 @@ struct RootView: View {
         case "play":
             let explicitPage = URLComponents(url: url, resolvingAgainstBaseURL: false)?
                 .queryItems?.first(where: { $0.name == "p" })?.value.flatMap(Int.init)
-            let page = explicitPage ?? 1
+            // Clamped before `page - 1`, which would trap on `?p=-9223372036854775808`.
+            let page = max(1, explicitPage ?? 1)
             Task {
                 do {
                     let detail = try await API.videoDetail(bvid: bvid)

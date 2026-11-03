@@ -111,15 +111,18 @@ public final class PagedModel<Item: Identifiable & Sendable> {
         defer { if myToken == token { isLoadingMore = false } }
         do {
             var (last, result) = (page, try await fetch(page))
-            // An empty page (all filtered out) isn't the end: nothing would appear to trigger the next load.
-            while result.items.isEmpty, result.hasMore, last - page + 1 < Self.maxEmptyPages {
+            func fresh() -> [Item] { result.items.filter { !seen.contains($0.id) } }
+            // A page with nothing new (all filtered out, or all already shown when a ranked list shifted) isn't the
+            // end: nothing would appear to trigger the next load.
+            while fresh().isEmpty, result.hasMore, last - page + 1 < Self.maxEmptyPages {
                 guard myToken == token, page == nextPage else { return }
                 last += 1
                 result = try await fetch(last)
             }
             guard myToken == token, page == nextPage else { return }
-            items.append(contentsOf: result.items.filter { seen.insert($0.id).inserted })
-            hasMore = result.hasMore && !result.items.isEmpty
+            let added = result.items.filter { seen.insert($0.id).inserted }
+            items.append(contentsOf: added)
+            hasMore = result.hasMore && !added.isEmpty
             nextPage = last + 1
         } catch {
             guard myToken == token, !BiliClient.isCancellation(error) else { return }

@@ -561,8 +561,9 @@ extension BiliText {
     /// "1.2万" / "3.4亿" / "1234" → number.
     public static func count(_ s: String) -> Int {
         let t = s.trimmingCharacters(in: .whitespaces)
-        if t.hasSuffix("亿"), let v = Double(t.dropLast()) { return Int(v * 100_000_000) }
-        if t.hasSuffix("万"), let v = Double(t.dropLast()) { return Int(v * 10000) }
+        // `Double` accepts "nan" / "inf" / "1e300": `Int(exactly:)` turns those into 0 instead of trapping.
+        if t.hasSuffix("亿"), let v = Double(t.dropLast()) { return Int(exactly: (v * 100_000_000).rounded(.towardZero)) ?? 0 }
+        if t.hasSuffix("万"), let v = Double(t.dropLast()) { return Int(exactly: (v * 10000).rounded(.towardZero)) ?? 0 }
         return Int(t) ?? 0
     }
 }

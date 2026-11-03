@@ -355,7 +355,8 @@ struct NumberScanner {
             }
             i += 1
         }
-        guard sawDigit, let text = String(bytes: chars[start ..< i], encoding: .ascii), let value = Double(text) else {
+        // `Double("1e999")` is +inf: reject it, or a size built from it turns into NaN and traps on Int conversion.
+        guard sawDigit, let text = String(bytes: chars[start ..< i], encoding: .ascii), let value = Double(text), value.isFinite else {
             i = start
             return nil
         }

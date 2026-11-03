@@ -69,7 +69,10 @@ final class PlayerViewController: AVPlayerViewController, PlayerTeardown {
     /// cid whose danmaku/subtitles/chapters are loaded; quality switches and recovery keep them.
     private var extrasCID = 0
     private var chapterGroups: [AVTimedMetadataGroup] = []
-    private var appliedRuleCount = -1
+    /// `AccountDanmakuRules.stamp` of the rules in the overlay's filter.
+    private var appliedRulesStamp = -1
+    /// Playback seconds since the last failure (counted while recovery attempts have been spent).
+    private var healthySeconds = 0
     private var menuSignature = ""
     /// OP/ED of the current page and which ones were already auto-skipped.
     private var skips: [SkipRange] = []
@@ -99,6 +102,8 @@ final class PlayerViewController: AVPlayerViewController, PlayerTeardown {
     private static let reportInterval = 15
     private static let upNextLeadTime: Double = 10
     private static let maxRecoveryAttempts = 2
+    /// Seconds of playback after a recovery before the attempts are available again.
+    private static let recoveryRefillSeconds = 120
 
     init(request: PlayRequest) {
         phase = .starting(PlaybackTarget(request: request, story: nil))
@@ -529,6 +534,15 @@ final class PlayerViewController: AVPlayerViewController, PlayerTeardown {
         updateTestMarker()
         #endif
         guard seconds.isFinite, let item = player?.currentItem, !isSwitchingPage else { return }
+        if fallbacks.recoveryAttempts > 0, player?.timeControlStatus == .playing {
+            // Recovered and playing fine for a while: a later failure (signed URLs expiring again ~2h on in a long
+            // video, a brief network drop) is recovered too instead of ending playback. The format fallbacks stay.
+            healthySeconds += 1
+            if healthySeconds >= Self.recoveryRefillSeconds {
+                fallbacks.recoveryAttempts = 0
+                healthySeconds = 0
+            }
+        }
         if CastReceiver.shared.player === self {
             CastReceiver.shared.playerProgress(position: seconds, duration: item.duration.seconds)
         }
@@ -1020,7 +1034,7 @@ final class PlayerViewController: AVPlayerViewController, PlayerTeardown {
     private func loadPageExtras(item: AVPlayerItem) {
         loadRelatedNext()
         overlay.load(cid: request.cid, accountRules: AccountDanmakuRules.cached)
-        appliedRuleCount = AccountDanmakuRules.cached.count
+        appliedRulesStamp = AccountDanmakuRules.stamp
         loadHeat()
         chapterGroups = []
         subtitles = []
@@ -1041,8 +1055,8 @@ final class PlayerViewController: AVPlayerViewController, PlayerTeardown {
         }
         subtitleTask = Task { [weak self] in
             await AccountDanmakuRules.refreshIfNeeded()
-            if let self, self.extrasCID == cid, AccountDanmakuRules.cached.count != self.appliedRuleCount {
-                self.appliedRuleCount = AccountDanmakuRules.cached.count
+            if let self, self.extrasCID == cid, AccountDanmakuRules.stamp != self.appliedRulesStamp {
+                self.appliedRulesStamp = AccountDanmakuRules.stamp
                 self.overlay.applyAccountRules(AccountDanmakuRules.cached)
             }
             guard let info = try? await API.playerInfo(bvid: bvid, cid: cid), !Task.isCancelled, let self, self.extrasCID == cid else { return }
@@ -1263,6 +1277,7 @@ final class PlayerViewController: AVPlayerViewController, PlayerTeardown {
         guard item === player?.currentItem else { return }
         let event = item.errorLog()?.events.last
         let httpStatus = event?.errorStatusCode ?? 0
+        healthySeconds = 0
         // Signed CDN URLs expire (~2h) and mirrors die: fetch fresh URLs once and continue in place.
         // A non-HTTP failure on HEVC/AV1 is treated as a decode problem: retry with AVC.
         if fallbacks.recoveryAttempts < Self.maxRecoveryAttempts {
@@ -1339,19 +1354,35 @@ final class PlayerViewController: AVPlayerViewController, PlayerTeardown {
 /// The account's cloud danmaku block list, fetched at most every 10 minutes.
 @MainActor
 enum AccountDanmakuRules {
-    private(set) static var cached: [JSON] = []
+    private static var rules: [JSON] = []
+    private static var version = 0
     private static var fetchedAt: Date?
     private static var fetchedFor: Int?
+
+    /// The current account's rules. Never another account's: right after a switch (or if fetching the new account's
+    /// rules fails) this is empty rather than the previous account's list.
+    static var cached: [JSON] { isCurrent ? rules : [] }
+
+    /// Changes whenever `cached` would: new rules, or rules that stopped (or started) belonging to the current account.
+    static var stamp: Int { isCurrent ? version : -1 }
+
+    private static var isCurrent: Bool {
+        fetchedFor != nil && fetchedFor == BiliClient.shared.currentAccount?.mid
+    }
 
     static func refreshIfNeeded() async {
         let mid = BiliClient.shared.currentAccount?.mid
         guard AppSettings.shared.danmakuSyncAccountFilter, let mid else {
-            cached = []
+            // Forget the fetch too: turning sync back on (or logging in) fetches again instead of trusting this.
+            rules = []
+            fetchedAt = nil
+            fetchedFor = nil
             return
         }
         if fetchedFor == mid, let fetchedAt, Date().timeIntervalSince(fetchedAt) < 600 { return }
-        guard let rules = try? await API.danmakuFilterRules() else { return }
-        cached = rules
+        guard let fetched = try? await API.danmakuFilterRules() else { return }
+        rules = fetched
+        version += 1
         fetchedAt = Date()
         fetchedFor = mid
     }
