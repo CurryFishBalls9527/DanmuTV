@@ -26,6 +26,8 @@ final class ParsingTests: XCTestCase {
         XCTAssertEqual(BiliText.duration(JSON("1:02:03")), 3723)
         XCTAssertEqual(BiliText.duration(JSON("9:13")), 553)
         XCTAssertEqual(BiliText.duration(JSON(42)), 42)
+        XCTAssertEqual(BiliText.duration(JSON("153722867280912931:0")), 0, "overflow gives 0, not a trap")
+        XCTAssertEqual(BiliText.duration(JSON(Array(repeating: "99", count: 12).joined(separator: ":"))), 0)
     }
 
     func testText() {

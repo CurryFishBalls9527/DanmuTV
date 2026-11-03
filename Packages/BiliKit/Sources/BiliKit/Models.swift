@@ -203,7 +203,15 @@ public enum BiliText {
     /// Duration in seconds from either an integer or a "h:mm:ss" / "mm:ss" string.
     public static func duration(_ j: JSON) -> Int {
         if let s = j.raw as? String, s.contains(":") {
-            return s.split(separator: ":").reduce(0) { $0 * 60 + (Int($1) ?? 0) }
+            // Server text: a huge or many-part value gives 0 rather than trapping on overflow.
+            var total = 0
+            for part in s.split(separator: ":") {
+                let (shifted, o1) = total.multipliedReportingOverflow(by: 60)
+                let (sum, o2) = shifted.addingReportingOverflow(Int(part) ?? 0)
+                guard !o1, !o2 else { return 0 }
+                total = sum
+            }
+            return total
         }
         return j.intValue
     }

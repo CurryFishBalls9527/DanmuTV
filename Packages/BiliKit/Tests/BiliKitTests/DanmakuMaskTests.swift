@@ -26,6 +26,12 @@ final class DanmakuMaskTests: XCTestCase {
         XCTAssertTrue(CGRect(x: -1, y: -1, width: 182, height: 322).contains(box), "\(box) lies inside the frame (y flipped by the group transform)")
     }
 
+    func testInfiniteViewBoxIsRejected() {
+        // Double("1e999") is +inf; a mask sized from it would trap building the alpha image.
+        XCTAssertNil(SVGMask.shape(fromSVG: "<svg viewBox=\"0 0 1e999 1080\"><path d=\"M0 0 H50 V50 H0 Z\"/></svg>"))
+        XCTAssertNil(SVGMask.viewBoxSize("<svg width=\"1e999\" height=\"10\">"))
+    }
+
     func testRejectsOtherData() {
         XCTAssertThrowsError(try WebMask(data: Data("not a mask at all".utf8)))
         XCTAssertThrowsError(try WebMask(data: Data("MASK".utf8) + Data([0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 5])))

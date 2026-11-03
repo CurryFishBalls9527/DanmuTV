@@ -61,6 +61,9 @@ final class ContentParsingTests: XCTestCase {
         XCTAssertEqual(BiliText.count("987"), 987)
         XCTAssertEqual(BiliText.count("--"), 0)
         XCTAssertEqual(BiliText.count("10万+"), 0, "unparseable stays 0 rather than guessing")
+        for junk in ["nan万", "inf亿", "-inf万", "1e300亿"] {
+            XCTAssertEqual(BiliText.count(junk), 0, "\(junk) must not trap")
+        }
     }
 
     func testSpaceUploadUsesLength() {

@@ -11,6 +11,12 @@ All notable changes to this project are documented here. The format follows
   formats it had already fallen back from (SDR / AVC / AAC), and progress is never saved under the item that didn't
   load. A related video that can't be played no longer ends related autoplay: the next one plays instead. A new part
   no longer shows the previous part's chapters until its own arrive.
+- Infinite scroll no longer stops for good when a page brings only items already shown (a ranked list that shifted
+  between pages): it looks further, and ends the list instead of stalling if nothing new comes.
+- Casting: GetMediaInfo / GetPositionInfo return the sender's DIDL metadata as XML again; plain metadata with `&amp;`
+  in a URL was echoed as escaped text.
+- Malformed server data no longer crashes the app: a huge sidx `first_offset` (the mirror fails over instead), an
+  infinite mask viewBox, `nan` / `inf` / huge play counts, and overflowing duration strings.
 - Player: an error that can't be shown as an alert (something else still on screen, e.g. the story chooser leaving)
   appears as a notice instead of not at all.
 

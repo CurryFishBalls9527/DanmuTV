@@ -37,6 +37,28 @@ final class FeedModelTests: XCTestCase {
         XCTAssertFalse(model.hasMore)
     }
 
+    func testPageOfOnlyDuplicatesKeepsPaging() async {
+        // A ranked list shifted: page 2 repeats page 1 exactly. Nothing new would appear to trigger the next load.
+        let model = FeedModel { page in
+            switch page {
+            case 1, 2: (self.items(1 ... 5), true)
+            default: (self.items(6 ... 8), false)
+            }
+        }
+        await model.refresh()
+        await model.loadMore()
+        XCTAssertEqual(model.items.map(\.aid), Array(1 ... 8))
+        XCTAssertFalse(model.hasMore)
+    }
+
+    func testOnlyDuplicatesForeverEndsPaging() async {
+        let model = FeedModel { _ in (self.items(1 ... 5), true) }
+        await model.refresh()
+        await model.loadMore()
+        XCTAssertEqual(model.items.count, 5)
+        XCTAssertFalse(model.hasMore, "the list ends instead of stalling with hasMore still set")
+    }
+
     func testLoadMoreFinishingAfterRefreshIsDropped() async {
         var release: CheckedContinuation<Void, Never>?
         var requested: [Int] = []
